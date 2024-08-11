@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "socket-chat-room"
+version = "0.1.0"
+description = ""
+authors = ["Christopher Carroll Smith <chriscarrollsmith@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "server", from = "." },
+    { include = "client", from = "." },
+    { include = "encryption", from = "." },
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.11.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "."
+packages = ["server", "client", "encryption"]
