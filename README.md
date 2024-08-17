@@ -70,6 +70,18 @@ poetry run python client.client
 
 7. Send messages or files using the provided interface.
 
+## Run with Docker
+
+1. Build the Docker image:
+```bash
+docker build -t server-app .
+```
+
+2. Run the Docker container:
+```bash
+docker run -p 8888:8888 server-app
+```
+
 ## Development
 
 I'm using `poetry` to manage the project and `mypy` for type checking. To lint the project, run:

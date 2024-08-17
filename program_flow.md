@@ -80,7 +80,9 @@ After starting the main window loop, `run` uses the `NetworkManager`'s `add_even
 
 The `show_login` method of the `UIManager` class initializes a `LoginWindow` instance, passing our connected `network_manager` as an argument, and assigns it to the `login_window` instance variable of `ui_manager`.
 
-The `LoginWindow`'s `__init__` method saves the `network_manager` as an instance variable and sets a `login_successful` instance variable to `False`. It then constructs a non-resizable, 320x240 "top level" `tkinter.Tk` widget titled "Login" with two string variables, `username` and `password`, for the username and password fields. It constructs and places these fields (`tkinter.Entry` widgets) and corresponding labels (`tkinter.Label`). It also constructs and places "Login" and "Register" buttons (`tkinter.Button`), which call the `handle_login` and `handle_register` methods of the `NetworkManager`, respectively.
+The `LoginWindow`'s `__init__` method saves the `network_manager` as an instance variable and sets a `login_successful` instance variable to `False`. It then constructs a non-resizable, 300x180 "top level" `tkinter.Tk` widget titled "Login" with two string variables, `username` and `password`, for the username and password fields. It constructs and places these fields (`tkinter.Entry` widgets) and corresponding labels (`tkinter.Label`). It also constructs and places "Login" and "Register" buttons (`tkinter.Button`), which call the `handle_login` and `handle_register` methods of the `NetworkManager`, respectively.
+
+**TODO: Update description of UI construction; add some detail on `Frame` and `pack`**
 
 After initializing the window, the `show_login` method calls the window's `run_login_loop` method. `run_login_loop` calls the window's `mainloop` method (a tkinter method that listens for events and dispatches the appropriate handlers) and then destroys the window after the loop exits. It returns the `login_successful` instance variable.
 
@@ -136,9 +138,11 @@ Finally `receive` deserializes the decrypted JSON string using `json.loads` and 
 
 ## Server-side authentication handling
 
-TODO
+**TODO**
 
 ## Main window loop
+
+**TODO**
 
 The `show_main` method creates a `threading.Thread` instance to handle incoming messages from the server, and assigns it to the `receive_thread` instance variable. The `_receive_loop` method of the `NetworkManager` class is passed as the target for the thread, and the thread is started.
 
