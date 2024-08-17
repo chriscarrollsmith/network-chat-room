@@ -30,7 +30,7 @@ class Handler(socketserver.BaseRequestHandler):
         """
         Initialize the handler for a new client connection.
         """
-        self.user: str = ""
+        self.username: str = ""
         self.file_peer: str = ""
         self.authed: bool = False
         logging.info(f"New connection from {self.client_address}")
@@ -72,9 +72,9 @@ class Handler(socketserver.BaseRequestHandler):
             self.authed = False
 
             with Handler.clients_lock:
-                if self.user in Handler.clients:
-                    del Handler.clients[self.user]
-                    logging.info(f"Removed {self.user} from connected clients")
+                if self.username in Handler.clients:
+                    del Handler.clients[self.username]
+                    logging.info(f"Removed {self.username} from connected clients")
 
             self._notify_peer_left()
 
@@ -85,19 +85,21 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing authentication information.
         """
-        self.user = data["user"]
+        self.username = data.get("username", "")
 
-        if data["cmd"] == "login":
+        if data.get("cmd") == "login":
             self._process_login(data)
-        elif data["cmd"] == "register":
+        elif data.get("cmd") == "register":
             self._process_registration(data)
 
     def _process_login(self, data: dict[str, str]) -> None:
-        if self.user_manager.validate(data["user"], data["pwd"]):
+        if self.user_manager.validate(
+            data.get("username", ""), data.get("password", "")
+        ):
             send(self.request, {"response": "ok"})
             self.authed = True
             with Handler.clients_lock:
-                Handler.clients[self.user] = self
+                Handler.clients[self.username] = self
             self._notify_peer_joined()
         else:
             send(
@@ -115,7 +117,9 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing registration information.
         """
-        if self.user_manager.register(data["user"], data["pwd"]):
+        if self.user_manager.register(
+            data.get("username", ""), data.get("password", "")
+        ):
             send(self.request, {"response": "ok"})
         else:
             send(
@@ -131,7 +135,7 @@ class Handler(socketserver.BaseRequestHandler):
             for user in Handler.clients.keys():
                 send(
                     Handler.clients[user].request,
-                    {"type": "peer_joined", "peer": self.user},
+                    {"type": "peer_joined", "peer": self.username},
                 )
 
     def _handle_authenticated_commands(self, data: dict[str, str]) -> None:
@@ -151,16 +155,19 @@ class Handler(socketserver.BaseRequestHandler):
             "close": self._handle_close,
         }
 
-        handler = cmd_handlers.get(data["cmd"])
+        command: str = data.get("cmd", "")
+        handler = cmd_handlers.get(command)
         if handler:
             try:
                 handler(data)
             except Exception as e:
                 logging.error(
-                    f"Error handling command {data['cmd']} from {self.user}: {e}"
+                    f"Error handling command {command} from {self.username}: {e}"
                 )
         else:
-            logging.warning(f"Unknown command received from {self.user}: {data['cmd']}")
+            logging.warning(
+                f"Unknown or missing command received from {self.username}: {command}"
+            )
 
     def _handle_get_users(self, data: dict[str, str]) -> None:
         """
@@ -170,7 +177,7 @@ class Handler(socketserver.BaseRequestHandler):
             data (dict): The received data (unused in this method).
         """
         with Handler.clients_lock:
-            users = [user for user in Handler.clients.keys() if user != self.user]
+            users = [user for user in Handler.clients.keys() if user != self.username]
         send(self.request, {"type": "get_users", "data": users})
 
     def _handle_get_history(self, data: dict[str, str]) -> None:
@@ -185,7 +192,7 @@ class Handler(socketserver.BaseRequestHandler):
             {
                 "type": "get_history",
                 "peer": data["peer"],
-                "data": self.chat_history.get_history(self.user, data["peer"]),
+                "data": self.chat_history.get_history(self.username, data["peer"]),
             },
         )
 
@@ -212,9 +219,9 @@ class Handler(socketserver.BaseRequestHandler):
             if data["peer"] in Handler.clients:
                 send(
                     Handler.clients[data["peer"]].request,
-                    {"type": "msg", "peer": self.user, "msg": data["msg"]},
+                    {"type": "msg", "peer": self.username, "msg": data["msg"]},
                 )
-        self.chat_history.append_to_history(self.user, data["peer"], data["msg"])
+        self.chat_history.append_to_history(self.username, data["peer"], data["msg"])
 
     def _handle_broadcast_chat(self, data: dict[str, str]) -> None:
         """
@@ -225,17 +232,18 @@ class Handler(socketserver.BaseRequestHandler):
         """
         with Handler.clients_lock:
             for user in Handler.clients.keys():
-                if user != self.user:
+                if user != self.username:
                     send(
                         Handler.clients[user].request,
                         {
                             "type": "broadcast",
-                            "peer": self.user,
+                            "peer": self.username,
                             "msg": data["msg"],
                         },
                     )
-        self.chat_history.append_to_history(self.user, "", data["msg"])
+        self.chat_history.append_to_history(self.username, "", data["msg"])
 
+    # TODO: Use a different key (e.g., "status") for success/failure, not a separate error event type
     def _handle_file_request(self, data: dict[str, str]) -> None:
         """
         Handle file transfer requests.
@@ -245,12 +253,12 @@ class Handler(socketserver.BaseRequestHandler):
         """
         with Handler.clients_lock:
             if data["peer"] in Handler.clients:
-                Handler.clients[data["peer"]].file_peer = self.user
+                Handler.clients[data["peer"]].file_peer = self.username
                 send(
                     Handler.clients[data["peer"]].request,
                     {
                         "type": "file_request",
-                        "peer": self.user,
+                        "peer": self.username,
                         "filename": data["filename"],
                         "size": data["size"],
                         "md5": data["md5"],
@@ -278,7 +286,7 @@ class Handler(socketserver.BaseRequestHandler):
                 if data["peer"] in Handler.clients:
                     send(
                         Handler.clients[data["peer"]].request,
-                        {"type": "file_deny", "peer": self.user},
+                        {"type": "file_deny", "peer": self.username},
                     )
 
     def _handle_file_accept(self, data: dict[str, str]) -> None:
@@ -314,7 +322,7 @@ class Handler(socketserver.BaseRequestHandler):
             for user in Handler.clients.keys():
                 send(
                     Handler.clients[user].request,
-                    {"type": "peer_left", "peer": self.user},
+                    {"type": "peer_left", "peer": self.username},
                 )
 
 

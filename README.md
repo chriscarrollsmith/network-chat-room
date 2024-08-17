@@ -7,7 +7,8 @@ A Python-based network chat room application using Tkinter for GUI and sockets f
 - Learn how to use Python's Tkinter module for building GUI applications.
 - Learn how to use Python's socket module for TCP data transmission.
 - Learn how to implement basic XOR encryption with an initialization vector.
-- Implement a multi-threaded server in Python without a third-party library.
+- Learn how to implement a multi-threaded server in Python without a third-party library.
+- Learn how to implement strict typing with `mypy`.
 
 ## Features
 
@@ -23,7 +24,7 @@ A Python-based network chat room application using Tkinter for GUI and sockets f
 ## Implementation Details
 
 ### Encryption and Decryption
-- Custom `encrypt` and `decrypt` functions using XOR encryption with an initialization vector
+- Custom `encrypt` and `decrypt` functions using XOR encryption with an initialization vector (although in this simplified implementation, we're sending the key and IV as plaintext, which is totally insecure)
 
 ### Network Communication
 - Socket-based data transmission with packet size prefixing
@@ -69,14 +70,24 @@ poetry run python client.client
 
 7. Send messages or files using the provided interface.
 
+## Development
+
+I'm using `poetry` to manage the project and `mypy` for type checking. To lint the project, run:
+
+```bash
+poetry run mypy .
+```
+
+Feel free to submit pull requests or open issues to improve the project.
+
 ## Note
 
-This is a basic implementation for educational purposes. For production use, consider implementing:
+This is a very basic implementation for educational purposes only. For production use, consider implementing:
 
-- Secure data transmission using SSL/TLS
-- Stronger encryption algorithm
+- Secure key exchange protocol such as Diffie-Hellman, RSA, PSK, SSL/TLS, etc.
+- Stronger encryption algorithm such as AES-256, Blowfish, Twofish, etc.
 - Database for user and chat history storage
-- Hashing stored user data
-- Enhanced error handling
+- Hashing stored user data with a secure hashing algorithm
+- Enhanced error handling and input validation
 - Comprehensive logging
 - Additional features and UI improvements

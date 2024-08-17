@@ -20,37 +20,37 @@ class UserManager:
         except (FileNotFoundError, pickle.UnpicklingError):
             return {}
 
-    def register(self, usr: str, pwd: str) -> bool:
+    def register(self, username: str, password: str) -> bool:
         """
         Register a new user.
 
         Args:
-            usr: The username to register.
-            pwd: The password for the new user.
+            username: The username to register.
+            password: The password for the new user.
 
         Returns:
             True if registration is successful, False if the username already exists.
         """
         with self.lock:
-            if usr not in self.users:
-                self.users[usr] = pwd
+            if username not in self.users:
+                self.users[username] = password
                 self.save_users()
                 return True
             return False
 
-    def validate(self, usr: str, pwd: str) -> bool:
+    def validate(self, username: str, password: str) -> bool:
         """
         Validate user credentials.
 
         Args:
-            usr: The username to validate.
-            pwd: The password to validate.
+            username: The username to validate.
+            password: The password to validate.
 
         Returns:
             True if credentials are valid, False otherwise.
         """
         with self.lock:
-            return usr in self.users and self.users[usr] == pwd
+            return username in self.users and self.users[username] == password
 
     def save_users(self) -> None:
         """

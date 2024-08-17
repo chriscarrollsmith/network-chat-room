@@ -69,7 +69,7 @@ class FileManager:
 
             with open(filename, "wb") as f:
                 while True:
-                    file_data = client_socket.receive(1024)
+                    file_data = client_socket.recv(1024)
                     if not file_data:
                         break
                     total_bytes += len(file_data)

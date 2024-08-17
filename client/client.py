@@ -43,15 +43,18 @@ class Client:
                 "file_request", self.ui_manager.main_window.handle_file_request
             )
             self.network_manager.add_event_handler(
-                "update_user_list", self.ui_manager.main_window.update_user_list
-            )
-            self.network_manager.add_event_handler(
                 "file_accept", self.ui_manager.main_window.handle_file_accept
             )
             self.network_manager.add_event_handler(
                 "file_deny", self.ui_manager.main_window.handle_file_deny
             )
-            # TODO: Add more handlers?
+            self.network_manager.add_event_handler(
+                "peer_left", self.ui_manager.main_window.handle_peer_left
+            )
+            self.network_manager.add_event_handler(
+                "peer_joined", self.ui_manager.main_window.handle_peer_joined
+            )
+            # TODO: Add "msg" event type handler
 
 
 if __name__ == "__main__":

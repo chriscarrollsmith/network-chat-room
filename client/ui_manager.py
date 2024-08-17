@@ -1,7 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from typing import Optional
+from typing import Optional, Any
 from client.network_manager import NetworkManager
 from client.chat_manager import ChatManager
 from client.file_manager import FileManager
@@ -27,7 +27,6 @@ class UIManager:
 
 
 class LoginWindow:
-    # TODO: Add a cancel or "x" button to exit program
     def __init__(self, network_manager: NetworkManager) -> None:
         self.network_manager: NetworkManager = network_manager
 
@@ -36,63 +35,81 @@ class LoginWindow:
         self.password: tk.StringVar = tk.StringVar()
         self.login_successful = False
 
-        self.window.geometry("320x240")
         self.window.title("Login")
-        self.window.resizable(width=False, height=False)
 
-        self.username_label: tk.Label = tk.Label(self.window, text="Username")
-        self.username_label.place(relx=0.055, rely=0.1, height=31, width=89)
+        # Set minimum size instead of fixed size
+        self.window.minsize(300, 180)
 
-        self.username_field: tk.Entry = tk.Entry(
-            self.window, textvariable=self.username
+        # Allow window to be resized
+        self.window.resizable(True, True)
+
+        # Main frame
+        main_frame = tk.Frame(self.window, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Username row
+        username_frame = tk.Frame(main_frame)
+        username_frame.pack(fill=tk.X, pady=5)
+        tk.Label(username_frame, text="Username", width=10).pack(side=tk.LEFT)
+        tk.Entry(username_frame, textvariable=self.username).pack(
+            side=tk.RIGHT, expand=True, fill=tk.X
         )
-        self.username_field.place(relx=0.28, rely=0.11, height=26, relwidth=0.554)
 
-        self.password_label: tk.Label = tk.Label(self.win, text="Password")
-        self.password_label.place(relx=0.055, rely=0.27, height=31, width=89)
-
-        self.password_field: tk.Entry = tk.Entry(
-            self.window, show="*", textvariable=self.password
+        # Password row
+        password_frame = tk.Frame(main_frame)
+        password_frame.pack(fill=tk.X, pady=5)
+        tk.Label(password_frame, text="Password", width=10).pack(side=tk.LEFT)
+        tk.Entry(password_frame, show="*", textvariable=self.password).pack(
+            side=tk.RIGHT, expand=True, fill=tk.X
         )
-        self.password_field.place(relx=0.28, rely=0.28, height=26, relwidth=0.554)
 
-        self.login_button: tk.Button = tk.Button(
-            self.window, text="Login", command=self.handle_login
+        # Buttons row
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=20)
+        tk.Button(button_frame, text="Login", command=self.handle_login).pack(
+            side=tk.LEFT, expand=True, padx=5
         )
-        self.login_button.place(relx=0.13, rely=0.6, height=32, width=88)
-
-        self.register_button: tk.Button = tk.Button(
-            self.window, text="Register", command=self.handle_register
+        tk.Button(button_frame, text="Register", command=self.handle_register).pack(
+            side=tk.RIGHT, expand=True, padx=5
         )
-        self.register_button.place(relx=0.6, rely=0.6, height=32, width=88)
 
     # TODO: Handle login and registration responses with an event loop? This would allow login events not directly triggered by the UI, e.g. magic link login
     def handle_login(self) -> None:
+        # To get value of tk.StringVar, use .get()
         username: str = self.username.get()
         password: str = self.password.get()
-        response: Optional[dict[str, str]] = self.network_manager.login(
-            username, password
-        )
-        if response and response["response"] == "ok":
-            self.login_successful = True
-            self.window.quit()
-        else:
-            messagebox.showerror(
-                "Error", "Login failed. Please check your credentials."
+        try:
+            response: dict[str, Any] | None = self.network_manager.login(
+                username, password
             )
+            if response and response.get("response") == "ok":
+                self.login_successful = True
+                self.window.quit()
+            elif response and response.get("response") == "failed":
+                messagebox.showerror("Error", f"Login failed: {response.get('reason')}")
+            else:
+                raise Exception("No response from server.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Login failed: {str(e)}")
+            return
 
     def handle_register(self) -> None:
+        # To get value of tk.StringVar, use .get()
         username: str = self.username.get()
         password: str = self.password.get()
-        response: bool = self.network_manager.register(username, password)
-        if response:
-            messagebox.showinfo(
-                "Success", "Registration successful. You can now log in."
+        try:
+            response: dict[str, Any] | None = self.network_manager.register(
+                username, password
             )
-        else:
-            messagebox.showerror(
-                "Error", "Registration failed. Please try a different username."
-            )
+            if response:
+                messagebox.showinfo(
+                    "Success", "Registration successful. You can now log in."
+                )
+            else:
+                raise Exception("No response from server.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Registration failed: {str(e)}")
+            return
 
     def run_login_loop(self) -> bool:
         self.window.mainloop()
@@ -111,60 +128,77 @@ class MainWindow:
         self.chat_manager: ChatManager = chat_manager
         self.file_manager: FileManager = file_manager
 
-        self.win: tk.Tk = tk.Tk()
-        self.win.geometry("480x320")
-        self.win.title("Chat Room")
-        self.win.resizable(width=False, height=False)
+        self.window: tk.Tk = tk.Tk()
+        self.window.title("Chat Room")
+        self.window.minsize(480, 320)
 
         self.msg: tk.StringVar = tk.StringVar()
         self.name: tk.StringVar = tk.StringVar()
+        self.current_chat: tk.StringVar = tk.StringVar(value="Global Chat Room")
 
-        self.user_list: tk.Listbox = tk.Listbox(self.win)
-        self.user_list.place(relx=0.75, rely=0.15, relheight=0.72, relwidth=0.23)
-        self.user_list.bind("<<ListboxSelect>>", self.on_user_select)
+        # Main frame
+        main_frame = tk.Frame(self.window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        self.label1: tk.Label = tk.Label(self.win, text="Online Users")
-        self.label1.place(relx=0.76, rely=0.075, height=21, width=101)
+        # Top frame for user welcome message
+        top_frame = tk.Frame(main_frame)
+        top_frame.pack(fill=tk.X, pady=(0, 10))
+        self.label2: tk.Label = tk.Label(top_frame, textvariable=self.name)
+        self.label2.pack()
 
-        self.history: tk.Text = tk.Text(self.win)
-        self.history.place(relx=0.02, rely=0.24, relheight=0.63, relwidth=0.696)
+        # Middle frame for chat and user list
+        middle_frame = tk.Frame(main_frame)
+        middle_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Chat frame (left side of middle frame)
+        chat_frame = tk.Frame(middle_frame)
+        chat_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+
+        self.label_current_chat: tk.Label = tk.Label(
+            chat_frame, textvariable=self.current_chat
+        )
+        self.label_current_chat.pack(anchor=tk.W, pady=(0, 5))
+
+        self.history: tk.Text = tk.Text(chat_frame)
+        self.history.pack(fill=tk.BOTH, expand=True)
         self.history.configure(state="disabled")
 
-        self.entry_msg: tk.Entry = tk.Entry(self.win, textvariable=self.msg)
-        self.entry_msg.place(relx=0.02, rely=0.9, height=24, relwidth=0.59)
+        # User list frame (right side of middle frame)
+        user_list_frame = tk.Frame(middle_frame)
+        user_list_frame.pack(side=tk.RIGHT, fill=tk.BOTH)
 
-        self.btn_send: tk.Button = tk.Button(self.win, text="Send")
-        self.btn_send.place(relx=0.62, rely=0.89, height=28, width=45)
+        tk.Label(user_list_frame, text="Online Users").pack(anchor=tk.W, pady=(0, 5))
 
-        self.btn_file: tk.Button = tk.Button(self.win, text="Send File")
-        self.btn_file.place(relx=0.752, rely=0.89, height=28, width=108)
+        self.user_list: tk.Listbox = tk.Listbox(user_list_frame)
+        self.user_list.pack(fill=tk.BOTH, expand=True)
+        self.user_list.bind("<<ListboxSelect>>", self.on_user_select)
+
+        # Bottom frame for message input and buttons
+        bottom_frame = tk.Frame(main_frame)
+        bottom_frame.pack(fill=tk.X, pady=(10, 0))
+
+        self.entry_msg: tk.Entry = tk.Entry(bottom_frame, textvariable=self.msg)
+        self.entry_msg.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+
+        self.btn_send: tk.Button = tk.Button(
+            bottom_frame, text="Send", command=lambda: self.send_message("")
+        )
+        self.btn_send.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.btn_file: tk.Button = tk.Button(
+            bottom_frame, text="Send File", command=lambda: self.send_file("")
+        )
+        self.btn_file.pack(side=tk.LEFT)
         self.btn_file.configure(state="disabled")
 
-        self.label2: tk.Label = tk.Label(self.win, textvariable=self.name)
-        self.label2.place(relx=0.24, rely=0.0, height=57, width=140)
-
-        self.current_chat: tk.StringVar = tk.StringVar(value="Global Chat Room")
-        self.label_current_chat: tk.Label = tk.Label(
-            self.win, textvariable=self.current_chat
-        )
-        self.label_current_chat.place(relx=0.02, rely=0.18, height=21, width=200)
-
-        if self.btn_send:
-            self.btn_send.configure(command=lambda: self.send_message(""))
-
-        if self.btn_file:
-            self.btn_file.configure(command=lambda: self.send_file(""))
-
-        if self.name:
-            self.name.set(
-                f"Welcome, {getattr(self.network_manager, 'username', 'User')}"
-            )
+        # Set welcome message
+        self.name.set(f"Welcome, {getattr(self.network_manager, 'username', 'User')}")
 
     def show(self) -> None:
-        self.win.mainloop()
+        self.window.mainloop()
 
     def destroy(self) -> None:
-        self.win.destroy()
+        self.window.destroy()
 
     def on_user_select(self, event: tk.Event) -> None:
         selection = self.user_list.curselection()
@@ -267,3 +301,51 @@ class MainWindow:
     def handle_file_deny(self) -> None:
         messagebox.showinfo("Info", "File transfer denied by recipient")
         self.file_manager._reset_file_state()
+
+    def handle_peer_joined(self, data: dict) -> None:
+        """
+        Handle the event when a new peer joins the chat.
+
+        Args:
+            data (dict): A dictionary containing the peer information.
+        """
+        peer = data.get("peer")
+        if peer:
+            # Add the new peer to the user list
+            self.update_user_list({peer: False})
+            # Append a system message to the chat history
+            self.append_message(
+                "System",
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                f"{peer} has joined the chat.",
+            )
+
+    def handle_peer_left(self, data: dict) -> None:
+        """
+        Handle the event when a peer leaves the chat.
+
+        Args:
+            data (dict): A dictionary containing the peer information.
+        """
+        peer = data.get("peer")
+        if peer:
+            # Remove the peer from the user list
+            current_users = {
+                item.split(" (")[0]: False
+                for item in self.user_list.get(0, tk.END)
+                if item != "Global Chat Room"
+            }
+            if peer in current_users:
+                del current_users[peer]
+            self.update_user_list(current_users)
+            # Append a system message to the chat history
+            self.append_message(
+                "System",
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                f"{peer} has left the chat.",
+            )
+
+            # If the current chat was with the peer who left, switch to global chat
+            if self.current_session == peer:
+                self.current_session = ""
+                self.current_chat.set("Global Chat Room")

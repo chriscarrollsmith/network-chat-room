@@ -2,6 +2,7 @@ import socket
 import json
 import threading
 import logging
+from tkinter import messagebox
 from typing import Any, Callable
 from encryption.utils import send, receive
 
@@ -16,7 +17,9 @@ class NetworkManager:
         self.connected: bool = False
         self.receive_thread: threading.Thread | None = None
         self.max_buff_size: int = 1024
-        self.event_handlers: dict[str, list[Callable]] = {}
+        self.event_handlers: dict[str, list[Callable]] = {
+            "unknown": [lambda data: logger.error(f"Unknown event: {data}")]
+        }
 
     def connect(self):
         try:
@@ -24,17 +27,18 @@ class NetworkManager:
             self.socket.connect((self.host, self.port))
             self.connected = True
         except Exception as e:
-            logger.error(f"Connection error: {str(e)}")
+            messagebox.showerror("Error", f"Failed to connect to server: {str(e)}")
         return self.connected
 
     def send(self, data_dict: dict[str, Any]) -> None:
         if not self.connected or self.socket is None:
-            raise ConnectionError("Not connected to server")
+            raise ConnectionError("Error sending data: lost connection to server")
         try:
             send(self.socket, data_dict)
         except Exception as e:
             logger.error(f"Send error: {str(e)}")
             self.close()
+            raise e
 
     def receive(self) -> dict[str, Any] | None:
         if not self.connected or self.socket is None:
@@ -53,18 +57,18 @@ class NetworkManager:
             self.close()
             return None
 
-    def login(self, username: str, password: str) -> dict | None:
-        self.send({"cmd": "login", "user": username, "pwd": password})
+    def login(self, username: str, password: str) -> dict[str, Any] | None:
+        self.send({"cmd": "login", "username": username, "password": password})
         response = self.receive()
         if response and response.get("response") == "ok":
             self.username = username
             self.start_receive_loop()
         return response
 
-    def register(self, username: str, password: str) -> bool:
-        self.send({"cmd": "register", "user": username, "pwd": password})
+    def register(self, username: str, password: str) -> dict[str, Any] | None:
+        self.send({"cmd": "register", "username": username, "password": password})
         response = self.receive()
-        return True if response and response.get("response") == "ok" else False
+        return response
 
     def start_receive_loop(self) -> None:
         if not self.receive_thread:
@@ -80,7 +84,7 @@ class NetworkManager:
         while self.connected:
             data: dict | None = self.receive()
             if data:
-                event: str = data.get("cmd", "unknown")
+                event: str = data.get("type", "unknown")
                 handlers: list[Callable] = self.event_handlers.get(event, [])
                 for handler in handlers:
                     handler(data)
