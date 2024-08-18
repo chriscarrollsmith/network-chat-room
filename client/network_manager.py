@@ -7,6 +7,7 @@ from typing import Any, Callable
 from encryption.utils import send, receive
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class NetworkManager:
@@ -15,10 +16,11 @@ class NetworkManager:
         self.host: str = host
         self.port: int = port
         self.connected: bool = False
+        self.username: str = ""
         self.receive_thread: threading.Thread | None = None
         self.max_buff_size: int = 1024
         self.event_handlers: dict[str, list[Callable]] = {
-            "unknown": [lambda data: logger.error(f"Unknown event: {data}")]
+            "unknown": [lambda data: logger.debug(f"Ignored unhandled event: {data}")]
         }
 
     def connect(self):
@@ -37,7 +39,7 @@ class NetworkManager:
             send(self.socket, data_dict)
         except Exception as e:
             logger.error(f"Send error: {str(e)}")
-            self.close()
+            self.close_connection()
             raise e
 
     def receive(self) -> dict[str, Any] | None:
@@ -50,25 +52,12 @@ class NetworkManager:
             return None
         except ConnectionError as e:
             logger.error(f"Connection error: {e}")
-            self.close()
+            self.close_connection()
             return None
         except Exception as e:
             logger.error(f"Receive error: {str(e)}")
-            self.close()
+            self.close_connection()
             return None
-
-    def login(self, username: str, password: str) -> dict[str, Any] | None:
-        self.send({"cmd": "login", "username": username, "password": password})
-        response = self.receive()
-        if response and response.get("response") == "ok":
-            self.username = username
-            self.start_receive_loop()
-        return response
-
-    def register(self, username: str, password: str) -> dict[str, Any] | None:
-        self.send({"cmd": "register", "username": username, "password": password})
-        response = self.receive()
-        return response
 
     def start_receive_loop(self) -> None:
         if not self.receive_thread:
@@ -80,6 +69,11 @@ class NetworkManager:
             self.event_handlers[event] = []
         self.event_handlers[event].append(handler)
 
+    def clear_event_handlers(self) -> None:
+        self.event_handlers = {
+            "unknown": [lambda data: logger.debug(f"Ignored unhandled event: {data}")]
+        }
+
     def _receive_loop(self) -> None:
         while self.connected:
             data: dict | None = self.receive()
@@ -89,11 +83,14 @@ class NetworkManager:
                 for handler in handlers:
                     handler(data)
 
-    def close(self) -> None:
+    def close_connection(self) -> None:
         self.connected = False
         if self.socket:
             self.socket.close()
+        self.socket = None
+        self.close_receive_thread()
+
+    def close_receive_thread(self) -> None:
         if self.receive_thread and self.receive_thread != threading.current_thread():
             self.receive_thread.join()
-        self.socket = None
         self.receive_thread = None

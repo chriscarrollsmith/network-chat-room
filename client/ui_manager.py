@@ -1,7 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-from typing import Optional, Any
+from typing import Optional
 from client.network_manager import NetworkManager
 from client.chat_manager import ChatManager
 from client.file_manager import FileManager
@@ -12,28 +12,16 @@ class UIManager:
         self.login_window: Optional[LoginWindow] = None
         self.main_window: Optional[MainWindow] = None
 
-    def show_login(self, network_manager: NetworkManager) -> bool:
-        self.login_window = LoginWindow(network_manager)
-        return self.login_window.run_login_loop()
-
-    def show_main(
-        self,
-        network_manager: NetworkManager,
-        chat_manager: ChatManager,
-        file_manager: FileManager,
-    ) -> None:
-        self.main_window = MainWindow(network_manager, chat_manager, file_manager)
-        self.main_window.show()
-
 
 class LoginWindow:
     def __init__(self, network_manager: NetworkManager) -> None:
         self.network_manager: NetworkManager = network_manager
 
+        self.authed: bool = False
+
         self.window: tk.Tk = tk.Tk()
         self.username: tk.StringVar = tk.StringVar()
         self.password: tk.StringVar = tk.StringVar()
-        self.login_successful = False
 
         self.window.title("Login")
 
@@ -66,55 +54,47 @@ class LoginWindow:
         # Buttons row
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=20)
-        tk.Button(button_frame, text="Login", command=self.handle_login).pack(
+        tk.Button(button_frame, text="Login", command=self.login).pack(
             side=tk.LEFT, expand=True, padx=5
         )
-        tk.Button(button_frame, text="Register", command=self.handle_register).pack(
+        tk.Button(button_frame, text="Register", command=self.register).pack(
             side=tk.RIGHT, expand=True, padx=5
         )
 
-    # TODO: Handle login and registration responses with an event loop? This would allow login events not directly triggered by the UI, e.g. magic link login
-    def handle_login(self) -> None:
+    def login(self) -> None:
         # To get value of tk.StringVar, use .get()
         username: str = self.username.get()
         password: str = self.password.get()
         try:
-            response: dict[str, Any] | None = self.network_manager.login(
-                username, password
+            self.network_manager.send(
+                {"cmd": "login", "username": username, "password": password}
             )
-            if response and response.get("response") == "ok":
-                self.login_successful = True
-                self.window.quit()
-            elif response and response.get("response") == "failed":
-                messagebox.showerror("Error", f"Login failed: {response.get('reason')}")
-            else:
-                raise Exception("No response from server.")
         except Exception as e:
-            messagebox.showerror("Error", f"Login failed: {str(e)}")
-            return
+            messagebox.showerror("Error", f"Failed to send login request: {str(e)}")
 
-    def handle_register(self) -> None:
+    def register(self) -> None:
         # To get value of tk.StringVar, use .get()
         username: str = self.username.get()
         password: str = self.password.get()
-        try:
-            response: dict[str, Any] | None = self.network_manager.register(
-                username, password
-            )
-            if response:
-                messagebox.showinfo(
-                    "Success", "Registration successful. You can now log in."
-                )
-            else:
-                raise Exception("No response from server.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Registration failed: {str(e)}")
-            return
+        self.network_manager.send(
+            {"cmd": "register", "username": username, "password": password}
+        )
 
-    def run_login_loop(self) -> bool:
+    def show(self):
         self.window.mainloop()
-        self.window.destroy()
-        return self.login_successful
+        try:
+            self.network_manager.close_receive_thread()
+            self.network_manager.clear_event_handlers()
+            self.destroy()
+            return self.authed
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to close login window: {str(e)}")
+
+    def destroy(self):
+        try:
+            self.window.destroy()
+        except:
+            pass
 
 
 class MainWindow:
@@ -124,81 +104,92 @@ class MainWindow:
         chat_manager: ChatManager,
         file_manager: FileManager,
     ) -> None:
-        self.network_manager: NetworkManager = network_manager
-        self.chat_manager: ChatManager = chat_manager
-        self.file_manager: FileManager = file_manager
+        try:
+            self.network_manager: NetworkManager = network_manager
+            self.chat_manager: ChatManager = chat_manager
+            self.file_manager: FileManager = file_manager
 
-        self.window: tk.Tk = tk.Tk()
-        self.window.title("Chat Room")
-        self.window.minsize(480, 320)
+            self.window: tk.Tk = tk.Tk()
+            self.window.title("Chat Room")
+            self.window.minsize(480, 320)
 
-        self.msg: tk.StringVar = tk.StringVar()
-        self.name: tk.StringVar = tk.StringVar()
-        self.current_chat: tk.StringVar = tk.StringVar(value="Global Chat Room")
+            self.msg: tk.StringVar = tk.StringVar()
+            self.name: tk.StringVar = tk.StringVar()
+            self.current_chat: tk.StringVar = tk.StringVar(value="Global Chat Room")
 
-        # Main frame
-        main_frame = tk.Frame(self.window)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            # Main frame
+            main_frame = tk.Frame(self.window)
+            main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Top frame for user welcome message
-        top_frame = tk.Frame(main_frame)
-        top_frame.pack(fill=tk.X, pady=(0, 10))
-        self.label2: tk.Label = tk.Label(top_frame, textvariable=self.name)
-        self.label2.pack()
+            # Top frame for user welcome message
+            top_frame = tk.Frame(main_frame)
+            top_frame.pack(fill=tk.X, pady=(0, 10))
+            self.label2: tk.Label = tk.Label(top_frame, textvariable=self.name)
+            self.label2.pack()
 
-        # Middle frame for chat and user list
-        middle_frame = tk.Frame(main_frame)
-        middle_frame.pack(fill=tk.BOTH, expand=True)
+            # Middle frame for chat and user list
+            middle_frame = tk.Frame(main_frame)
+            middle_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Chat frame (left side of middle frame)
-        chat_frame = tk.Frame(middle_frame)
-        chat_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+            # Chat frame (left side of middle frame)
+            chat_frame = tk.Frame(middle_frame)
+            chat_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
-        self.label_current_chat: tk.Label = tk.Label(
-            chat_frame, textvariable=self.current_chat
-        )
-        self.label_current_chat.pack(anchor=tk.W, pady=(0, 5))
+            self.label_current_chat: tk.Label = tk.Label(
+                chat_frame, textvariable=self.current_chat
+            )
+            self.label_current_chat.pack(anchor=tk.W, pady=(0, 5))
 
-        self.history: tk.Text = tk.Text(chat_frame)
-        self.history.pack(fill=tk.BOTH, expand=True)
-        self.history.configure(state="disabled")
+            self.history: tk.Text = tk.Text(chat_frame)
+            self.history.pack(fill=tk.BOTH, expand=True)
+            self.history.configure(state="disabled")
 
-        # User list frame (right side of middle frame)
-        user_list_frame = tk.Frame(middle_frame)
-        user_list_frame.pack(side=tk.RIGHT, fill=tk.BOTH)
+            # User list frame (right side of middle frame)
+            user_list_frame = tk.Frame(middle_frame)
+            user_list_frame.pack(side=tk.RIGHT, fill=tk.BOTH)
 
-        tk.Label(user_list_frame, text="Online Users").pack(anchor=tk.W, pady=(0, 5))
+            tk.Label(user_list_frame, text="Online Users").pack(
+                anchor=tk.W, pady=(0, 5)
+            )
 
-        self.user_list: tk.Listbox = tk.Listbox(user_list_frame)
-        self.user_list.pack(fill=tk.BOTH, expand=True)
-        self.user_list.bind("<<ListboxSelect>>", self.on_user_select)
+            self.user_list: tk.Listbox = tk.Listbox(user_list_frame)
+            self.user_list.pack(fill=tk.BOTH, expand=True)
+            self.user_list.bind("<<ListboxSelect>>", self.on_user_select)
 
-        # Bottom frame for message input and buttons
-        bottom_frame = tk.Frame(main_frame)
-        bottom_frame.pack(fill=tk.X, pady=(10, 0))
+            # Bottom frame for message input and buttons
+            bottom_frame = tk.Frame(main_frame)
+            bottom_frame.pack(fill=tk.X, pady=(10, 0))
 
-        self.entry_msg: tk.Entry = tk.Entry(bottom_frame, textvariable=self.msg)
-        self.entry_msg.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+            self.entry_msg: tk.Entry = tk.Entry(bottom_frame, textvariable=self.msg)
+            self.entry_msg.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
-        self.btn_send: tk.Button = tk.Button(
-            bottom_frame, text="Send", command=lambda: self.send_message("")
-        )
-        self.btn_send.pack(side=tk.LEFT, padx=(0, 5))
+            self.btn_send: tk.Button = tk.Button(
+                bottom_frame, text="Send", command=lambda: self.send_message("")
+            )
+            self.btn_send.pack(side=tk.LEFT, padx=(0, 5))
 
-        self.btn_file: tk.Button = tk.Button(
-            bottom_frame, text="Send File", command=lambda: self.send_file("")
-        )
-        self.btn_file.pack(side=tk.LEFT)
-        self.btn_file.configure(state="disabled")
+            self.btn_file: tk.Button = tk.Button(
+                bottom_frame, text="Send File", command=lambda: self.send_file("")
+            )
+            self.btn_file.pack(side=tk.LEFT)
+            self.btn_file.configure(state="disabled")
 
-        # Set welcome message
-        self.name.set(f"Welcome, {getattr(self.network_manager, 'username', 'User')}")
+            # Set welcome message
+            self.name.set(f"Welcome, {self.network_manager.username or 'User'}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create main window: {str(e)}")
 
     def show(self) -> None:
         self.window.mainloop()
+        self.network_manager.close_connection()
+        self.destroy()
 
     def destroy(self) -> None:
-        self.window.destroy()
+        try:
+            self.window.destroy()
+        except:
+            pass
 
     def on_user_select(self, event: tk.Event) -> None:
         selection = self.user_list.curselection()

@@ -93,22 +93,24 @@ class Handler(socketserver.BaseRequestHandler):
             self._process_registration(data)
 
     def _process_login(self, data: dict[str, str]) -> None:
+        login_result: dict[str, str] = {
+            "type": "login_result",
+            "username": data.get("username", ""),
+        }
         if self.user_manager.validate(
             data.get("username", ""), data.get("password", "")
         ):
-            send(self.request, {"response": "ok"})
+            login_result.update({"response": "ok"})
+            send(self.request, login_result)
             self.authed = True
             with Handler.clients_lock:
                 Handler.clients[self.username] = self
             self._notify_peer_joined()
         else:
-            send(
-                self.request,
-                {
-                    "response": "fail",
-                    "reason": "Incorrect username or password!",
-                },
+            login_result.update(
+                {"response": "fail", "reason": "Incorrect username or password!"}
             )
+            send(self.request, login_result)
 
     def _process_registration(self, data: dict[str, str]) -> None:
         """
@@ -117,14 +119,20 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing registration information.
         """
+        register_result: dict[str, str] = {
+            "type": "register_result",
+            "username": data.get("username", ""),
+        }
         if self.user_manager.register(
             data.get("username", ""), data.get("password", "")
         ):
-            send(self.request, {"response": "ok"})
+            send(self.request, register_result.update({"response": "ok"}))
         else:
             send(
                 self.request,
-                {"response": "fail", "reason": "Username already exists!"},
+                register_result.update(
+                    {"response": "fail", "reason": "Username already exists!"}
+                ),
             )
 
     def _notify_peer_joined(self) -> None:
@@ -219,7 +227,11 @@ class Handler(socketserver.BaseRequestHandler):
             if data["peer"] in Handler.clients:
                 send(
                     Handler.clients[data["peer"]].request,
-                    {"type": "msg", "peer": self.username, "msg": data["msg"]},
+                    {
+                        "type": "message_received",
+                        "peer": self.username,
+                        "msg": data["msg"],
+                    },
                 )
         self.chat_history.append_to_history(self.username, data["peer"], data["msg"])
 
