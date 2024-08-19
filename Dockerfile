@@ -12,7 +12,7 @@ COPY pyproject.toml poetry.lock ./
 
 # Copy necessary folders and files
 COPY client /app/client
-COPY encryption /app/encryption
+COPY utils /app/utils
 COPY server /app/server
 COPY agent /app/agent
 

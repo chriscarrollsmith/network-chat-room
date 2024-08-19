@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [
     { include = "server", from = "." },
     { include = "client", from = "." },
-    { include = "encryption", from = "." },
+    { include = "utils", from = "." },
 ]
 
 [tool.poetry.dependencies]
@@ -25,4 +25,4 @@ build-backend = "poetry.core.masonry.api"
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = "."
-packages = ["server", "client", "encryption"]
+packages = ["server", "client", "utils"]

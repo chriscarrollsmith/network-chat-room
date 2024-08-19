@@ -1,10 +1,22 @@
 import socket
 import random
 import time
-from typing import Any
-from encryption.utils import send, receive
+import threading
+import logging
+from typing import Any, Literal, Callable
+from utils.encryption import send, receive
+from client.file_manager import get_file_md5, format_file_size
+
+from utils.logger import configure_logger
+
+# Configure the logger
+configure_logger()
+
+# Get a logger for this module
+logger = logging.getLogger(__name__)
 
 
+# TODO: Add event handling for received data
 class Agent:
     """Automated agent that can be used to interact with the server for testing purposes"""
 
@@ -15,75 +27,259 @@ class Agent:
         self.connected = False
         self.username = "User" + str(random.randint(1, 9))
         self.password = "password"
+        self.registered = False
+        self.authed = False
         self.receive_thread = None
-        self.timeout = 5
+        self.stop_loop: bool = False
+        self.current_session: str = ""
+        self.event_handlers: dict[str, list[Callable]] = {
+            "register_result": [self.handle_register_result],
+            "login_result": [self.handle_login_result],
+            "message": [self.handle_receive_message],
+            "file_request": [self.handle_file_request],
+            "file_accept": [self.handle_file_accept],
+            "file_deny": [self.handle_file_deny],
+            "peer_joined": [self.handle_peer_joined],
+            "peer_left": [self.handle_peer_left],
+        }
+        self._filename: str = ""
+        self._filename_short: str = ""
+        self._file_transfer_pending: bool = False
+
+    # --- Connection management ---
 
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((self.host, self.port))
-        self.socket.settimeout(self.timeout)
+        self.receive_thread = threading.Thread(target=self.receive_loop)
+        self.receive_thread.start()
         self.connected = True
-        if not self.connected or self.socket is None:
+        if (
+            not self.connected
+            or self.socket is None
+            or self.receive_thread is None
+            or not self.receive_thread.is_alive()
+        ):
             raise ConnectionError("Failed to connect to the server.")
-
-    def register(self):
-        username: str = self.username
-        password: str = self.password
-
-        if not self.connected or self.socket is None:
-            raise ConnectionError("Lost connection to the server.")
-
-        self.send({"cmd": "register", "username": username, "password": password})
-        response = self.receive()
-
-        if response and response.get("response") == "ok":
-            return response
-        else:
-            raise Exception("Failed to register")
-
-    def login(self):
-        username: str = self.username
-        password: str = self.password
-
-        if not self.connected or self.socket is None:
-            raise ConnectionError("Lost connection to the server.")
-
-        self.send({"cmd": "login", "username": username, "password": password})
-        response = self.receive()
-
-        if response and response.get("response") == "ok":
-            return response
-        else:
-            raise Exception("Failed to login")
 
     def close(self) -> None:
         self.connected = False
         if self.socket:
             self.socket.close()
         if self.receive_thread:
+            self.stop_loop = True
             self.receive_thread.join()
         self.socket = None
         self.receive_thread = None
+
+    # --- State management ---
+
+    def append_message(self, sender: str, time: str, msg: str) -> None:
+        pass
+
+    def _reset_file_state(self) -> None:
+        self._filename = ""
+        self._filename_short = ""
+        self._file_transfer_pending = False
+
+    # --- Outgoing server communication ---
 
     def send(self, data_dict: dict[str, Any]) -> None:
         if not self.connected or self.socket is None:
             raise ConnectionError("Lost connection to server")
 
+        send(self.socket, data_dict)
+
+    def authenticate(self, type: Literal["register", "login"]):
+        username: str = self.username
+        password: str = self.password
+
+        if not self.connected or self.socket is None:
+            raise ConnectionError("Lost connection to the server.")
+
+        self.send({"cmd": type, "username": username, "password": password})
+
+    def send_file_request(self) -> None:
+        filename: str = "testfile.txt"
+
+        self._filename = filename
+        self._filename_short = os.path.basename(filename)
+        size: int = os.path.getsize(filename)
+        size_str: str = format_file_size(size)
+        md5_checksum: str = get_file_md5(filename)
+
+        self.send(
+            {
+                "cmd": "file_request",
+                "peer": self.current_session,
+                "filename": self._filename_short,
+                "size": size_str,
+                "md5": md5_checksum,
+            }
+        )
+
+        self._file_transfer_pending = True
+
+    def send_file_data(self, data: dict) -> tuple[int, float]:
         try:
-            send(self.socket, data_dict)
-        except Exception as e:
-            self.close()
-            raise e
+            total_bytes: int = 0
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+                client.connect((data["ip"], 1031))
+                start_time: float = time.time()
+
+                with open(self._filename, "rb") as f:
+                    while True:
+                        file_data = f.read(1024)
+                        if not file_data:
+                            break
+                        total_bytes += len(file_data)
+                        client.send(file_data)
+
+            end_time: float = time.time()
+            transfer_time: float = end_time - start_time
+            return total_bytes, transfer_time
+        finally:
+            self._reset_file_state()
+
+    # --- Incoming server communication ---
 
     def receive(self) -> dict[str, Any] | None:
         if not self.connected or self.socket is None:
             raise ConnectionError("Lost connection to server")
 
+        return receive(self.socket)
+
+    def receive_loop(self):
+        while self.connected and not self.stop_loop:
+            data: dict | None = self.receive()
+            if data:
+                event: str = data.get("type", "unknown")
+                handlers: list[Callable] = self.event_handlers.get(event, [])
+                for handler in handlers:
+                    handler(data)
+        self.stop_loop = False
+
+    def receive_file_data(self, filename: str) -> tuple[int, float]:
+        total_bytes: int = 0
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.bind(("0.0.0.0", 1031))
+            server.listen(1)
+            client_socket, _ = server.accept()
+            start_time: float = time.time()
+
+            with open(filename, "wb") as f:
+                while True:
+                    file_data = client_socket.recv(1024)
+                    if not file_data:
+                        break
+                    total_bytes += len(file_data)
+                    f.write(file_data)
+
+        end_time: float = time.time()
+        transfer_time: float = end_time - start_time
+        return total_bytes, transfer_time
+
+    # --- Event handlers ---
+
+    def handle_register_result(self, data: dict) -> None:
+        if data.get("response") == "ok":
+            logger.info(f"Registration successful for {data.get('username')}")
+        elif data.get("response") == "failed":
+            if data.get("reason") == "Username already exists!":
+                self.registered = True
+                logger.info(f"User {data.get('username')} already registered")
+            else:
+                raise Exception(f"Registration failed: {data.get('reason')}")
+        else:
+            raise Exception("Invalid response from server.")
+
+    def handle_login_result(self, data: dict) -> None:
+        if data.get("response") == "ok":
+            self.authed = True
+            logger.info(f"Login successful for {data.get('username')}")
+        elif data.get("response") == "failed":
+            raise Exception(f"Login failed: {data.get('reason')}")
+        else:
+            raise Exception("Invalid response from server.")
+
+    def handle_receive_message(self, data: dict) -> None:
+        """
+        Handle incoming chat messages.
+
+        Args:
+            data (dict): A dictionary containing message data.
+        """
+        # Extract message details from the data
+        sender: str = data.get("peer", "Unknown")
+        message: str = data.get("message", "")
+        timestamp: str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+        # Log the received message
+        logger.info(f"Message received from {sender} at {timestamp}: {message}")
+
+        # Reply to the incoming message
+        reply = f"Hello, {sender}"
+        self.send({"cmd": "message", "peer": sender, "message": reply})
+        logger.info(f"Replied to {sender}: {reply}")
+
+    def handle_file_request(self, data: dict) -> None:
+        peer = data.get("peer", "Unknown")
+        filename = data.get("filename", "Unknown")
+        size = data.get("size", "Unknown")
+        logger.info(f"File request received from {peer}: {filename} ({size} bytes)")
+
+        # For this automated agent, we'll always accept file transfers
+        self.send({"cmd": "file_accept", "peer": peer})
+        logger.info(f"Accepted file transfer from {peer}")
+
         try:
-            return receive(self.socket)
+            total_bytes, transfer_time = self.receive_file_data(filename)
+            logger.info(
+                f"File received: {total_bytes} bytes from {peer} in {transfer_time:.2f} seconds"
+            )
         except Exception as e:
-            self.close()
-            raise e
+            logger.error(f"Error receiving file: {str(e)}")
+
+    def handle_file_accept(self, data: dict) -> None:
+        try:
+            peer = data.get("peer", "Unknown")
+            bytes_sent, transfer_time = self.send_file_data(data)
+            logger.info(
+                f"File sent: {bytes_sent} bytes to {peer} in {transfer_time:.2f} seconds"
+            )
+        except Exception as e:
+            logger.error(f"Error sending file: {str(e)}")
+
+    def handle_file_deny(self) -> None:
+        logger.info("File transfer denied by recipient")
+        self._reset_file_state()
+
+    def handle_peer_joined(self, data: dict) -> None:
+        """
+        Handle the event when a new peer joins the chat.
+
+        Args:
+            data (dict): A dictionary containing the peer information.
+        """
+        peer = data.get("peer")
+        if peer:
+            logger.info(f"{peer} has joined the chat.")
+
+    def handle_peer_left(self, data: dict) -> None:
+        """
+        Handle the event when a peer leaves the chat.
+
+        Args:
+            data (dict): A dictionary containing the peer information.
+        """
+        peer = data.get("peer")
+        if peer:
+            logger.info(f"{peer} has left the chat.")
+
+            # If the current chat was with the peer who left, switch to global chat
+            if self.current_session == peer:
+                self.current_session = ""
+                logger.info("Switched to global chat")
 
 
 if __name__ == "__main__":
@@ -92,19 +288,21 @@ if __name__ == "__main__":
     server_ip = os.environ.get("SERVER_IP", "127.0.0.1")
     server_port = 8888
 
-    app = Agent(server_ip, server_port)
-    app.connect()
-
-    # Ignore registration errors, which may just mean the user is already registered
     try:
-        app.register()
-    except Exception as e:
-        print(f"Error registering: {e}")
+        app = Agent(server_ip, server_port)
+        app.connect()
 
-    try:
-        app.login()
-        # TODO: Event loop
-        time.sleep(10)
+        app.authenticate("register")
+        while not app.registered:
+            time.sleep(1)
+
+        app.authenticate("login")
+        while not app.authed:
+            time.sleep(1)
+
+        app.send({"cmd": "message", "peer": "", "message": "Hello, world!"})
+
+        time.sleep(60)
 
     finally:
         app.close()

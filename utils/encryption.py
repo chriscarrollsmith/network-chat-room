@@ -99,7 +99,7 @@ def send(socket: socket.socket, data_dict: dict[str, Any]) -> None:
     socket.sendall(packed_data)
 
 
-def receive(socket: socket.socket, max_buff_size: int = 1024) -> dict[str, Any]:
+def receive(socket: socket.socket, max_buff_size: int = 1024) -> dict[str, Any] | None:
     """
     Receive and decrypt data from a socket.
 
@@ -110,34 +110,35 @@ def receive(socket: socket.socket, max_buff_size: int = 1024) -> dict[str, Any]:
     Returns:
         Decrypted and parsed data as a Python object.
     """
-    data: bytes = b""
+    try:
+        data: bytes = b""
 
-    # Receive the length of the incoming data
-    length_prefix = socket.recv(2)
-    if len(length_prefix) != 2:
-        raise ConnectionError("Connection closed by remote host")
+        # Receive the length of the incoming data (waits indefinitely until data is received)
+        socket.settimeout(0.5)
+        length_prefix = socket.recv(2)
 
-    # Unpack the length prefix to get the total length of the message
-    surplus: int = struct.unpack(">H", length_prefix)[0]
-    socket.settimeout(5)
+        # Unpack the length prefix to get the total length of the message
+        surplus: int = struct.unpack(">H", length_prefix)[0]
 
-    # Receive data in chunks until we have the full message
-    while surplus:
-        receive_data: bytes = socket.recv(
-            max_buff_size if surplus > max_buff_size else surplus
-        )
-        if not receive_data:
-            raise ConnectionError("Connection closed by remote host")
-        data += receive_data
-        surplus -= len(receive_data)
+        # Receive data in chunks until we have the full message
+        socket.settimeout(5)
+        while surplus:
+            receive_data: bytes = socket.recv(
+                max_buff_size if surplus > max_buff_size else surplus
+            )
+            if not receive_data:
+                raise ConnectionError("Connection closed by remote host")
+            data += receive_data
+            surplus -= len(receive_data)
 
-    socket.settimeout(None)
+        # Extract key, IV, and encrypted data
+        logger.debug(f"Received data: {data!r}")
+        key: bytes = data[:32]
+        iv: bytes = data[32:48]
+        encrypted_data: bytes = data[48:]
 
-    # Extract key, IV, and encrypted data
-    key: bytes = data[:32]
-    iv: bytes = data[32:48]
-    encrypted_data: bytes = data[48:]
-
-    # Decrypt and parse the data
-    decrypted_data: bytes = decrypt(encrypted_data, key, iv)
-    return json.loads(decrypted_data)
+        # Decrypt and parse the data
+        decrypted_data: bytes = decrypt(encrypted_data, key, iv)
+        return json.loads(decrypted_data)
+    except Exception as e:
+        return None

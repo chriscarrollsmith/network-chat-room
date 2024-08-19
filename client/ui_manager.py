@@ -15,51 +15,94 @@ class UIManager:
 
 class LoginWindow:
     def __init__(self, network_manager: NetworkManager) -> None:
-        self.network_manager: NetworkManager = network_manager
+        try:
+            self.network_manager: NetworkManager = network_manager
 
-        self.authed: bool = False
+            self.authed: bool = False
 
-        self.window: tk.Tk = tk.Tk()
-        self.username: tk.StringVar = tk.StringVar()
-        self.password: tk.StringVar = tk.StringVar()
+            self.window: tk.Tk = tk.Tk()
+            self.username: tk.StringVar = tk.StringVar()
+            self.password: tk.StringVar = tk.StringVar()
 
-        self.window.title("Login")
+            self.window.title("Login")
 
-        # Set minimum size instead of fixed size
-        self.window.minsize(300, 180)
+            # Set minimum size instead of fixed size
+            self.window.minsize(300, 180)
 
-        # Allow window to be resized
-        self.window.resizable(True, True)
+            # Allow window to be resized
+            self.window.resizable(True, True)
 
-        # Main frame
-        main_frame = tk.Frame(self.window, padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+            # Main frame
+            main_frame = tk.Frame(self.window, padx=20, pady=20)
+            main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Username row
-        username_frame = tk.Frame(main_frame)
-        username_frame.pack(fill=tk.X, pady=5)
-        tk.Label(username_frame, text="Username", width=10).pack(side=tk.LEFT)
-        tk.Entry(username_frame, textvariable=self.username).pack(
-            side=tk.RIGHT, expand=True, fill=tk.X
-        )
+            # Username row
+            username_frame = tk.Frame(main_frame)
+            username_frame.pack(fill=tk.X, pady=5)
+            tk.Label(username_frame, text="Username", width=10).pack(side=tk.LEFT)
+            tk.Entry(username_frame, textvariable=self.username).pack(
+                side=tk.RIGHT, expand=True, fill=tk.X
+            )
 
-        # Password row
-        password_frame = tk.Frame(main_frame)
-        password_frame.pack(fill=tk.X, pady=5)
-        tk.Label(password_frame, text="Password", width=10).pack(side=tk.LEFT)
-        tk.Entry(password_frame, show="*", textvariable=self.password).pack(
-            side=tk.RIGHT, expand=True, fill=tk.X
-        )
+            # Password row
+            password_frame = tk.Frame(main_frame)
+            password_frame.pack(fill=tk.X, pady=5)
+            tk.Label(password_frame, text="Password", width=10).pack(side=tk.LEFT)
+            tk.Entry(password_frame, show="*", textvariable=self.password).pack(
+                side=tk.RIGHT, expand=True, fill=tk.X
+            )
 
-        # Buttons row
-        button_frame = tk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=20)
-        tk.Button(button_frame, text="Login", command=self.login).pack(
-            side=tk.LEFT, expand=True, padx=5
-        )
-        tk.Button(button_frame, text="Register", command=self.register).pack(
-            side=tk.RIGHT, expand=True, padx=5
-        )
+            # Buttons row
+            button_frame = tk.Frame(main_frame)
+            button_frame.pack(fill=tk.X, pady=20)
+            tk.Button(button_frame, text="Login", command=self.login).pack(
+                side=tk.LEFT, expand=True, padx=5
+            )
+            tk.Button(button_frame, text="Register", command=self.register).pack(
+                side=tk.RIGHT, expand=True, padx=5
+            )
+
+            # Register event handlers
+            self.network_manager.add_event_handler(
+                "login_result", self.handle_login_result
+            )
+            self.network_manager.add_event_handler(
+                "register_result", self.handle_register_result
+            )
+
+            # Start the event listener
+            self.network_manager.start_receive_loop()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create login window: {str(e)}")
+            raise e
+
+    def handle_register_result(self, data: dict) -> None:
+        try:
+            if data.get("response") == "ok":
+                messagebox.showinfo(
+                    "Success", "Registration successful. You can now log in."
+                )
+            elif data.get("response") == "failed":
+                messagebox.showerror(
+                    "Error", f"Registration failed: {data.get('reason')}"
+                )
+            else:
+                raise Exception("Invalid response from server.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Registration failed: {str(e)}")
+
+    def handle_login_result(self, data: dict) -> None:
+        try:
+            if data.get("response") == "ok":
+                self.authed = True
+                self.network_manager.username = data.get("username")
+                self.window.quit()
+            elif data.get("response") == "failed":
+                messagebox.showerror("Error", f"Login failed: {data.get('reason')}")
+            else:
+                raise Exception("Invalid response from server.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Login failed: {str(e)}")
 
     def login(self) -> None:
         # To get value of tk.StringVar, use .get()
@@ -83,8 +126,8 @@ class LoginWindow:
     def show(self):
         self.window.mainloop()
         try:
-            self.network_manager.close_receive_thread()
             self.network_manager.clear_event_handlers()
+            self.network_manager.close_receive_thread()
             self.destroy()
             return self.authed
         except Exception as e:
@@ -177,12 +220,38 @@ class MainWindow:
             # Set welcome message
             self.name.set(f"Welcome, {self.network_manager.username or 'User'}")
 
+            # Register event handlers
+            # TODO: Make this a method or create an EventManager class
+            # TODO: Create an event handler class to enforce the event system's API?
+            # TODO: Redefine event handler API and network_manager._receive_loop to pass output from previous handler as an argument for next?
+            # (Allows separation of data extraction and processing steps from UI updates)
+            self.network_manager.add_event_handler(
+                "message_received", self.receive_message
+            )
+            self.network_manager.add_event_handler(
+                "file_request", self.handle_file_request
+            )
+            self.network_manager.add_event_handler(
+                "file_accept", self.handle_file_accept
+            )
+            self.network_manager.add_event_handler("file_deny", self.handle_file_deny)
+            self.network_manager.add_event_handler("peer_left", self.handle_peer_left)
+            self.network_manager.add_event_handler(
+                "peer_joined", self.handle_peer_joined
+            )
+            # TODO: Add handler for "broadcast" event type
+
+            # Start the event listener
+            self.network_manager.start_receive_loop()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create main window: {str(e)}")
+            raise e
 
     def show(self) -> None:
         self.window.mainloop()
         self.network_manager.close_connection()
+        self.network_manager.close_receive_thread()
         self.destroy()
 
     def destroy(self) -> None:
@@ -199,12 +268,14 @@ class MainWindow:
             selected_user = value.split(" (")[0]  # Remove the (*) if present
             self.current_chat.set(f"Chatting with: {selected_user}")
             # Set current session to empty string for global chat, otherwise to selected user
-            self.current_session = (
+            self.chat_manager.current_session = (
                 "" if selected_user == "Global Chat Room" else selected_user
             )
             # Clear unread indicator for the selected user
-            self.network_manager.send({"cmd": "read", "peer": self.current_session})
-            self.update_user_list({self.current_session: False})
+            self.network_manager.send(
+                {"cmd": "read", "peer": self.chat_manager.current_session}
+            )
+            self.update_user_list({self.chat_manager.current_session: False})
 
     def update_user_list(self, users: dict[str, bool]) -> None:
         selected = self.user_list.curselection()
@@ -249,9 +320,9 @@ class MainWindow:
         self.history.see(tk.END)
         self.history["state"] = "disabled"
 
-    def send_file(self, filename: str) -> None:
+    def send_file(self) -> None:
         try:
-            self.file_manager.send_file_request(filename)
+            self.file_manager.send_file_request(self.current_chat.get())
         except Exception as e:
             messagebox.showerror("Error", f"Error sending file: {str(e)}")
 
@@ -337,6 +408,6 @@ class MainWindow:
             )
 
             # If the current chat was with the peer who left, switch to global chat
-            if self.current_session == peer:
-                self.current_session = ""
+            if self.chat_manager.current_session == peer:
+                self.chat_manager.current_session = ""
                 self.current_chat.set("Global Chat Room")

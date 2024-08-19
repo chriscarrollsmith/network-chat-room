@@ -2,7 +2,17 @@
 
 We are going to iteratively build up a natural language description of our program flow. We will look at one file at a time and only consider the code in that file.
 
-The program has two entry points: the `app.py` file in the `client` module and the `server.py` file in the `server` module.
+The program has three entry points: the `app.py` file in the `client` module, the `server.py` file in the `server` module, and an `agent.py` file in the agent folder (for spinning up an automated user agent for testing).
+
+## Logger configuration
+
+The first thing in each entrypoint is a function call to `configure_logger` and assignment of a `logging.getLogger()` result to a `logger` variable. The `configure_logger` function is defined in `utils/logger.py`.
+
+This function first creates a `root` logger set to log messages at the `logging.DEBUG` level and adds a `logger.StreamHandler` to it. It also creates and adds a `logging.Formatter` that includes the timestamp, name, log level, and message.
+
+The function then creates and adds a `queue.Queue` with -1 maxsize (no limit) and a `logging.handlers.QueueHandler` that uses the queue as a buffer. It also creates and starts a `logging.handlers.QueueListener`. Under the hood, the `QueueHandler` will push log records to the queue, and the `QueueListener` will pop them off and pass them to the `StreamHandler`.
+
+Since `logging.Logger` instances are singletons, we don't return the logger from this function. We run it once at the entrypoint, and all subsequent calls to `logging.getLogger` will inherit the configuration from the root logger.
 
 ## Server initialization
 
@@ -29,6 +39,8 @@ The Handler class's `setup` method creates empty `user`, `file_peer`, and `authe
 > `load_history` opens the `history.dat` file in binary mode and loads the `history` dictionary using `pickle.load`. If the file does not exist, it creates an empty dictionary.
 
 ## Client initialization
+
+**TODO: Update this section to reflect the new client architecture**
 
 When we start the client with `python -m client.app`, it creates an instance of the `Client` class at 127.0.0.1:8888.
 
@@ -86,6 +98,8 @@ The `LoginWindow`'s `__init__` method saves the `network_manager` as an instance
 
 After initializing the window, the `show_login` method calls the window's `run_login_loop` method. `run_login_loop` calls the window's `mainloop` method (a tkinter method that listens for events and dispatches the appropriate handlers) and then destroys the window after the loop exits. It returns the `login_successful` instance variable.
 
+**TODO: Update the following description of auth flow**
+
 The two handler methods, `handle_login` and `handle_register`, are responsible for getting the username and password from the `username` and `password` fields, sending them to appropriate network_manager method (`login` or `register`) for communication with the server, and displaying a success or failure message box to the user. `login` additionally sets the `login_successful` instance variable to `True` and exits the event loop by calling the tkinter window's `quit` method if the server indicates a successful login.
 
 > ### `NetworkManager` `register` method
@@ -114,7 +128,7 @@ The two handler methods, `handle_login` and `handle_register`, are responsible f
 
 ## Encryption utility functions
 
-The `send` and `receive` methods call some utility functions from `encryption/utils.py` that are shared by both the client and server, so this is a good place to explain how those functions work. These workhorse functions will be used throughout the application, not just for `login` and `register`, but this explanation will not be repeated, so you may want to come back and review it again later to understand the program flow of the main window loop.
+The `send` and `receive` methods call some utility functions from `utils/encryption.py` that are shared by both the client and server, so this is a good place to explain how those functions work. These workhorse functions will be used throughout the application, not just for `login` and `register`, but this explanation will not be repeated, so you may want to come back and review it again later to understand the program flow of the main window loop.
 
 ### `send` and `encrypt` functions
 

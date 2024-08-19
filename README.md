@@ -1,14 +1,19 @@
 # Network Chat Room
 
-A Python-based network chat room application using Tkinter for GUI and sockets for network communication. Based on [socket-chat-room](https://github.com/rihothy/socket-chat-room) by rihothy.
+A Python-based AIM (AOL Instant Messenger)-style desktop chat room application, based on rihothy's[socket-chat-room](https://github.com/rihothy/socket-chat-room), using Tkinter for GUI and sockets for network communication.
 
 ## Purpose
 
-- Learn how to use Python's Tkinter module for building GUI applications.
-- Learn how to use Python's socket module for TCP data transmission.
-- Learn how to implement basic XOR encryption with an initialization vector.
-- Learn how to implement a multi-threaded server in Python without a third-party library.
-- Learn how to implement strict typing with `mypy`.
+I mostly created this project for educational purposes: 
+
+- Learn to use Python's Tkinter module for building GUI desktop applications.
+- Learn to use Python's socket module for TCP data transmission.
+- Learn to implement a multi-threaded server and event system in Python without a third-party library.
+- Learn to implement basic XOR encryption with an initialization vector.
+- Learn to implement compile-time static type checking with `mypy`.
+- Submit as my final project for the HarvardX course ["CS50's Introduction to Computer Science"](https://learning.edx.org/course/course-v1:HarvardX+CS50+X/home).
+
+However, I'm also envisioning a practical use for this project: having autonomous AI agents running in Docker containers and using the chat app to update them on my progress (so they can encourage me to keep working), and they in turn can update me on their progress (so I can give them directions and advice to coordinate their work).
 
 ## Features
 

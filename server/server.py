@@ -2,7 +2,7 @@
 import socketserver
 import logging
 from typing import Callable
-from encryption.utils import send, receive
+from utils.encryption import send, receive
 from server.user_manager import UserManager
 from server.chat_history import ChatHistory
 import threading
@@ -43,12 +43,15 @@ class Handler(socketserver.BaseRequestHandler):
             while True:
                 try:
                     data: dict = receive(self.request, self.max_buff_size)
-                    logging.debug(f"Received data from {self.client_address}: {data}")
+                    if data:
+                        logging.debug(
+                            f"Received data from {self.client_address}: {data}"
+                        )
 
-                    if not self.authed:
-                        self._handle_authentication(data)
-                    else:
-                        self._handle_authenticated_commands(data)
+                        if not self.authed:
+                            self._handle_authentication(data)
+                        else:
+                            self._handle_authenticated_commands(data)
                 except ConnectionResetError:
                     logging.warning(f"Connection reset by {self.client_address}")
                     break

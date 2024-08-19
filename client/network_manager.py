@@ -2,12 +2,10 @@ import socket
 import json
 import threading
 import logging
-from tkinter import messagebox
 from typing import Any, Callable
-from encryption.utils import send, receive
+from utils.encryption import send, receive
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 class NetworkManager:
@@ -18,6 +16,7 @@ class NetworkManager:
         self.connected: bool = False
         self.username: str = ""
         self.receive_thread: threading.Thread | None = None
+        self.stop_loop: bool = False
         self.max_buff_size: int = 1024
         self.event_handlers: dict[str, list[Callable]] = {
             "unknown": [lambda data: logger.debug(f"Ignored unhandled event: {data}")]
@@ -29,8 +28,8 @@ class NetworkManager:
             self.socket.connect((self.host, self.port))
             self.connected = True
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to connect to server: {str(e)}")
-        return self.connected
+            logger.error(f"Failed to connect to server: {str(e)}")
+            raise ConnectionError(f"Failed to connect to server: {str(e)}")
 
     def send(self, data_dict: dict[str, Any]) -> None:
         if not self.connected or self.socket is None:
@@ -61,7 +60,9 @@ class NetworkManager:
 
     def start_receive_loop(self) -> None:
         if not self.receive_thread:
-            self.receive_thread = threading.Thread(target=self._receive_loop)
+            self.receive_thread = threading.Thread(
+                target=self._receive_loop, daemon=True
+            )
             self.receive_thread.start()
 
     def add_event_handler(self, event: str, handler: Callable) -> None:
@@ -75,22 +76,25 @@ class NetworkManager:
         }
 
     def _receive_loop(self) -> None:
-        while self.connected:
+        while self.connected and not self.stop_loop:
             data: dict | None = self.receive()
             if data:
                 event: str = data.get("type", "unknown")
                 handlers: list[Callable] = self.event_handlers.get(event, [])
                 for handler in handlers:
                     handler(data)
+        self.stop_loop = False
 
     def close_connection(self) -> None:
         self.connected = False
         if self.socket:
             self.socket.close()
         self.socket = None
-        self.close_receive_thread()
 
     def close_receive_thread(self) -> None:
+        # Signal the receive loop to stop
+        self.stop_loop = True
         if self.receive_thread and self.receive_thread != threading.current_thread():
+            # Wait for the receive loop to finish
             self.receive_thread.join()
         self.receive_thread = None

@@ -1,11 +1,26 @@
 import os
 import time
-import hashlib
 import socket
-from typing import Union
+import hashlib
 import tkinter.filedialog
 import tkinter.messagebox
 from client.network_manager import NetworkManager
+
+
+def get_file_md5(self, filepath: str) -> str:
+    md5_hash = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            md5_hash.update(chunk)
+    return md5_hash.hexdigest().upper()
+
+
+def format_file_size(size: int, suffix: str = "B") -> str:
+    for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
+        if abs(size) < 1024.0:
+            return f"{size:3.1f}{unit}{suffix}"
+        size /= 1024.0
+    return f"{size:.1f}Yi{suffix}"
 
 
 class FileManager:
@@ -23,8 +38,8 @@ class FileManager:
         self._filename = filename
         self._filename_short = os.path.basename(filename)
         size: int = os.path.getsize(filename)
-        size_str: str = self._format_file_size(size)
-        md5_checksum: str = self._get_file_md5(filename)
+        size_str: str = format_file_size(size)
+        md5_checksum: str = get_file_md5(filename)
 
         self.network_manager.send(
             {
@@ -78,24 +93,6 @@ class FileManager:
         end_time: float = time.time()
         transfer_time: float = end_time - start_time
         return total_bytes, transfer_time
-
-    def _format_file_size(self, size: int) -> str:
-        units = ["B", "KB", "MB", "GB", "TB", "PB"]
-        size_value: Union[int, float] = size
-        for unit in units:
-            if size_value < 1024 or unit == units[-1]:
-                if unit == "B":
-                    return f"{size_value}{unit}"
-                return f"{size_value:.2f}{unit}"
-            size_value /= 1024
-        return f"{size_value:.2f}PB"
-
-    def _get_file_md5(self, filepath: str) -> str:
-        md5_hash = hashlib.md5()
-        with open(filepath, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                md5_hash.update(chunk)
-        return md5_hash.hexdigest().upper()
 
     def _reset_file_state(self) -> None:
         self._filename = ""
