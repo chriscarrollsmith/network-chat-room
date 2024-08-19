@@ -48,29 +48,57 @@ class Agent:
 
     # --- Connection management ---
 
-    def connect(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((self.host, self.port))
-        self.receive_thread = threading.Thread(target=self.receive_loop)
-        self.receive_thread.start()
-        self.connected = True
-        if (
-            not self.connected
-            or self.socket is None
-            or self.receive_thread is None
-            or not self.receive_thread.is_alive()
-        ):
-            raise ConnectionError("Failed to connect to the server.")
+    def validate_connection_state(self, should_be_connected: bool) -> None:
+        state = "connected" if should_be_connected else "disconnected"
+        opposite_state = "disconnected" if should_be_connected else "connected"
 
+        if should_be_connected != self.connected:
+            raise ConnectionError(f"Expected to be {state} but was {opposite_state}.")
+
+        if should_be_connected:
+            if not self.socket:
+                raise ConnectionError(
+                    f"Expected socket to exist but it was {self.socket}."
+                )
+            if not self.receive_thread:
+                raise ConnectionError(
+                    f"Expected receive thread to exist but it was {self.receive_thread}."
+                )
+
+            # Wait for the thread to become alive with a 1-second timeout
+            start_time = time.time()
+            while not self.receive_thread.is_alive():
+                if time.time() - start_time > 1:
+                    raise ConnectionError(
+                        "Receive thread failed to start within 1 second."
+                    )
+                time.sleep(0.01)
+        else:
+            if self.socket:
+                raise ConnectionError(
+                    f"Expected socket to be None but it was {self.socket}."
+                )
+            if self.receive_thread and self.receive_thread.is_alive():
+                raise ConnectionError(
+                    f"Expected receive thread to not be alive but it was."
+                )
+
+    # In the close method:
     def close(self) -> None:
         self.connected = False
         if self.socket:
             self.socket.close()
         if self.receive_thread:
             self.stop_loop = True
-            self.receive_thread.join()
+            self.receive_thread.join(
+                timeout=5
+            )  # Add a timeout to prevent indefinite waiting
+            if self.receive_thread.is_alive():
+                raise ConnectionError("Failed to stop receive thread within 5 seconds.")
         self.socket = None
         self.receive_thread = None
+
+        self.validate_connection_state(should_be_connected=False)
 
     # --- State management ---
 
