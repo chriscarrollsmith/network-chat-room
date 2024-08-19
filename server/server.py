@@ -3,14 +3,14 @@ import socketserver
 import logging
 from typing import Callable
 from utils.encryption import send, receive
+from utils.logger import configure_logger
 from server.user_manager import UserManager
 from server.chat_history import ChatHistory
 import threading
 
-# Set up logging
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Set up logger
+configure_logger()
+logger = logging.getLogger(__name__)
 
 
 # Handler class for managing client connections
@@ -33,7 +33,7 @@ class Handler(socketserver.BaseRequestHandler):
         self.username: str = ""
         self.file_peer: str = ""
         self.authed: bool = False
-        logging.info(f"New connection from {self.client_address}")
+        logger.info(f"New connection from {self.client_address}")
 
     def handle(self) -> None:
         """
@@ -44,7 +44,7 @@ class Handler(socketserver.BaseRequestHandler):
                 try:
                     data: dict = receive(self.request, self.max_buff_size)
                     if data:
-                        logging.debug(
+                        logger.debug(
                             f"Received data from {self.client_address}: {data}"
                         )
 
@@ -53,13 +53,13 @@ class Handler(socketserver.BaseRequestHandler):
                         else:
                             self._handle_authenticated_commands(data)
                 except ConnectionResetError:
-                    logging.warning(f"Connection reset by {self.client_address}")
+                    logger.warning(f"Connection reset by {self.client_address}")
                     break
                 except ConnectionError as e:
-                    logging.warning(f"Connection error with {self.client_address}: {e}")
+                    logger.warning(f"Connection error with {self.client_address}: {e}")
                     break
                 except Exception as e:
-                    logging.error(
+                    logger.error(
                         f"Error handling request from {self.client_address}: {e}"
                     )
                     break
@@ -70,14 +70,14 @@ class Handler(socketserver.BaseRequestHandler):
         """
         Clean up when a client disconnects.
         """
-        logging.info(f"Client disconnected: {self.client_address}")
+        logger.info(f"Client disconnected: {self.client_address}")
         if self.authed:
             self.authed = False
 
             with Handler.clients_lock:
                 if self.username in Handler.clients:
                     del Handler.clients[self.username]
-                    logging.info(f"Removed {self.username} from connected clients")
+                    logger.info(f"Removed {self.username} from connected clients")
 
             self._notify_peer_left()
 
@@ -89,11 +89,15 @@ class Handler(socketserver.BaseRequestHandler):
             data (dict): The received data containing authentication information.
         """
         self.username = data.get("username", "")
+        logger.debug(f"Handling authentication for user: {self.username}")
 
         if data.get("cmd") == "login":
             self._process_login(data)
         elif data.get("cmd") == "register":
+            logger.debug("Received register command")
             self._process_registration(data)
+        else:
+            logger.warning(f"Unknown authentication command: {data.get('cmd')}")
 
     def _process_login(self, data: dict[str, str]) -> None:
         login_result: dict[str, str] = {
@@ -122,21 +126,39 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing registration information.
         """
+        logger.debug(f"Processing registration for user: {data.get('username', '')}")
         register_result: dict[str, str] = {
             "type": "register_result",
             "username": data.get("username", ""),
         }
-        if self.user_manager.register(
-            data.get("username", ""), data.get("password", "")
-        ):
-            send(self.request, register_result.update({"response": "ok"}))
-        else:
-            send(
-                self.request,
+        try:
+            logger.debug("Attempting to register user with UserManager")
+            registration_success = self.user_manager.register(
+                data.get("username", ""), data.get("password", "")
+            )
+            logger.debug(f"UserManager.register result: {registration_success}")
+
+            if registration_success:
+                register_result.update({"response": "ok"})
+                logger.debug(
+                    f"Registration successful for user: {data.get('username', '')}"
+                )
+            else:
                 register_result.update(
                     {"response": "fail", "reason": "Username already exists!"}
-                ),
+                )
+                logger.debug(
+                    f"Registration failed for user: {data.get('username', '')} - Username already exists"
+                )
+
+            logger.debug(f"Sending registration result: {register_result}")
+            send(self.request, register_result)
+        except Exception as e:
+            logger.error(f"Error during registration process: {str(e)}")
+            register_result.update(
+                {"response": "fail", "reason": "Internal server error"}
             )
+            send(self.request, register_result)
 
     def _notify_peer_joined(self) -> None:
         """
@@ -172,11 +194,11 @@ class Handler(socketserver.BaseRequestHandler):
             try:
                 handler(data)
             except Exception as e:
-                logging.error(
+                logger.error(
                     f"Error handling command {command} from {self.username}: {e}"
                 )
         else:
-            logging.warning(
+            logger.warning(
                 f"Unknown or missing command received from {self.username}: {command}"
             )
 
@@ -348,13 +370,13 @@ if __name__ == "__main__":
         app: socketserver.ThreadingTCPServer = socketserver.ThreadingTCPServer(
             ("0.0.0.0", 8888), Handler
         )
-        logging.info("Server started on 0.0.0.0:8888")
+        logger.info("Server started on 0.0.0.0:8888")
         app.serve_forever()
     except KeyboardInterrupt:
-        logging.info("Server shutting down...")
+        logger.info("Server shutting down...")
     except Exception as e:
-        logging.critical(f"Unexpected error: {e}")
+        logger.critical(f"Unexpected error: {e}")
     finally:
         if "app" in locals():
             app.server_close()
-        logging.info("Server shut down")
+        logger.info("Server shut down")
