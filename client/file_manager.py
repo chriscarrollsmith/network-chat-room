@@ -7,7 +7,7 @@ import tkinter.messagebox
 from client.network_manager import NetworkManager
 
 
-def get_file_md5(self, filepath: str) -> str:
+def get_file_md5(filepath: str) -> str:
     md5_hash = hashlib.md5()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
@@ -15,7 +15,7 @@ def get_file_md5(self, filepath: str) -> str:
     return md5_hash.hexdigest().upper()
 
 
-def format_file_size(size: int, suffix: str = "B") -> str:
+def format_file_size(size: int | float, suffix: str = "B") -> str:
     for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
         if abs(size) < 1024.0:
             return f"{size:3.1f}{unit}{suffix}"

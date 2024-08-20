@@ -114,7 +114,9 @@ def receive(socket: socket.socket, max_buff_size: int = 1024) -> dict[str, Any]:
 
     # Receive the length of the incoming data (waits indefinitely until data is received)
     socket.settimeout(None)
-    length_prefix: Optional[bytes] = socket.recv(2)
+    length_prefix: bytes = socket.recv(2)
+
+    # Raise an error if bytes object is empty, as this means socket disconnected
     if not length_prefix:
         raise ConnectionError("Connection closed by remote host")
 
@@ -124,7 +126,7 @@ def receive(socket: socket.socket, max_buff_size: int = 1024) -> dict[str, Any]:
     # Receive data in chunks until we have the full message
     socket.settimeout(5)
     while surplus:
-        receive_data: Optional[bytes] = socket.recv(
+        receive_data: bytes = socket.recv(
             max_buff_size if surplus > max_buff_size else surplus
         )
         if not receive_data:

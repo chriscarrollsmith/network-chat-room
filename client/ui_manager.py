@@ -91,7 +91,7 @@ class LoginWindow:
         try:
             if data.get("response") == "ok":
                 self.authed = True
-                self.network_manager.username = data.get("username")
+                self.network_manager.username = str(data.get("username"))
                 self.window.quit()
             elif data.get("response") == "fail":
                 messagebox.showerror("Error", f"Login failed: {data.get('reason')}")
