@@ -48,9 +48,9 @@ class Agent:
 
     # --- Connection management ---
 
-    def validate_connection_state(self, should_be_connected: bool) -> None:
-        state = "connected" if should_be_connected else "disconnected"
-        opposite_state = "disconnected" if should_be_connected else "connected"
+    def validate_connection_state(self, should_be_connected: bool = True) -> None:
+        state: str = "connected" if should_be_connected else "disconnected"
+        opposite_state: str = "disconnected" if should_be_connected else "connected"
 
         if should_be_connected != self.connected:
             raise ConnectionError(f"Expected to be {state} but was {opposite_state}.")
@@ -66,13 +66,18 @@ class Agent:
                 )
 
             # Wait for the thread to become alive with a 1-second timeout
-            start_time = time.time()
+            start_time: float = time.time()
+            timeout: float = 5.0
+            logger.debug(
+                f"Waiting for receive thread to become alive (timeout: {timeout}s)..."
+            )
             while not self.receive_thread.is_alive():
-                if time.time() - start_time > 1:
+                if time.time() - start_time > timeout:
                     raise ConnectionError(
-                        "Receive thread failed to start within 1 second."
+                        f"Receive thread failed to start within {timeout}-second timeout."
                     )
                 time.sleep(0.01)
+            logger.debug(f"Receive thread is alive.")
         else:
             if self.socket:
                 raise ConnectionError(
@@ -187,14 +192,21 @@ class Agent:
         return receive(self.socket)
 
     def receive_loop(self):
+        logger.debug("Receive loop started")
         while self.connected and not self.stop_loop:
-            data: dict | None = self.receive()
-            if data:
-                event: str = data.get("type", "unknown")
-                handlers: list[Callable] = self.event_handlers.get(event, [])
-                for handler in handlers:
-                    handler(data)
+            try:
+                data: dict | None = self.receive()
+                if data:
+                    event: str = data.get("type", "unknown")
+                    handlers: list[Callable] = self.event_handlers.get(event, [])
+                    for handler in handlers:
+                        handler(data)
+            except Exception as e:
+                logger.error(f"Error in receive loop: {str(e)}")
+                # Optionally, you might want to break the loop or set self.connected to False here
+                # depending on the nature of the error
         self.stop_loop = False
+        logger.debug("Receive loop ended")
 
     def receive_file_data(self, filename: str) -> tuple[int, float]:
         total_bytes: int = 0

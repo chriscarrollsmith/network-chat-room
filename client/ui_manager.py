@@ -68,9 +68,6 @@ class LoginWindow:
             self.network_manager.add_event_handler(
                 "register_result", self.handle_register_result
             )
-
-            # Start the event listener
-            self.network_manager.start_receive_loop()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create login window: {str(e)}")
             raise e
@@ -126,7 +123,8 @@ class LoginWindow:
         self.window.mainloop()
         try:
             self.network_manager.clear_event_handlers()
-            self.network_manager.close_receive_thread()
+            if not self.authed:
+                self.network_manager.close_connection()
             self.destroy()
             return self.authed
         except Exception as e:
@@ -240,8 +238,7 @@ class MainWindow:
             )
             # TODO: Add handler for "broadcast" event type
 
-            # Start the event listener
-            self.network_manager.start_receive_loop()
+            self.network_manager.validate_connection_state(should_be_connected=True)
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create main window: {str(e)}")
@@ -250,7 +247,6 @@ class MainWindow:
     def show(self) -> None:
         self.window.mainloop()
         self.network_manager.close_connection()
-        self.network_manager.close_receive_thread()
         self.destroy()
 
     def destroy(self) -> None:

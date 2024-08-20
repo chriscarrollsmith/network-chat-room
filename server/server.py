@@ -52,6 +52,10 @@ class Handler(socketserver.BaseRequestHandler):
                             self._handle_authentication(data)
                         else:
                             self._handle_authenticated_commands(data)
+                    else:
+                        logger.error(
+                            f"Empty message received from {self.client_address}"
+                        )
                 except ConnectionResetError:
                     logger.warning(f"Connection reset by {self.client_address}")
                     break
