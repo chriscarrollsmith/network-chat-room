@@ -43,7 +43,7 @@ class FileManager:
 
         self.network_manager.send(
             {
-                "cmd": "file_request",
+                "command": "file_request",
                 "peer": current_session,
                 "filename": self._filename_short,
                 "size": size_str,

@@ -104,7 +104,7 @@ The two handler methods, `handle_login` and `handle_register`, are responsible f
 
 > ### `NetworkManager` `register` method
 >
-> The `register` method of `NetworkManager` calls the `send` method of the same class, passing it a dictionary that includes "username", "password", and "cmd" keys. "cmd" is set to "register" to indicate that the client is requesting to register a new user account. We then call `receive` and assign the return value to the `response` variable. If the resonse is non-empty and its "response" key is "ok", the user is registered successfully and the method returns `True`. Otherwise, it returns `False`.
+> The `register` method of `NetworkManager` calls the `send` method of the same class, passing it a dictionary that includes "username", "password", and "command" keys. "command" is set to "register" to indicate that the client is requesting to register a new user account. We then call `receive` and assign the return value to the `response` variable. If the resonse is non-empty and its "response" key is "ok", the user is registered successfully and the method returns `True`. Otherwise, it returns `False`.
 >
 >> #### `NetworkManager` `send` method
 >>
@@ -118,13 +118,13 @@ The two handler methods, `handle_login` and `handle_register`, are responsible f
 >
 > ### `NetworkManager` `login` method
 >
-> The `login` method of `NetworkManager` calls the `send` method, passing it a dictionary with "username", "password", and "cmd" set to "login". We then call `receive` and assign the return value to `response`. If the resonse is non-empty and its "response" key is "ok", the NetworkManager's username instance variable is set for the current session, the `start_receive_loop` method is called to start listening for server messages that will trigger UI updates for the main window, and the method returns `True`. Otherwise, it returns `False`.
+> The `login` method of `NetworkManager` calls the `send` method, passing it a dictionary with "username", "password", and "command" set to "login". We then call `receive` and assign the return value to `response`. If the resonse is non-empty and its "response" key is "ok", the NetworkManager's username instance variable is set for the current session, the `start_receive_loop` method is called to start listening for server messages that will trigger UI updates for the main window, and the method returns `True`. Otherwise, it returns `False`.
 >
 >> #### `NetworkManager` `start_receive_loop` and `_receive_loop` methods
 >>
 >> The `start_receive_loop` method of `NetworkManager` does nothing if `receive_thread` is already running. Otherwise, it creates a new `threading.Thread`, passing `_receive_loop` as the target, and assigns it to the `receive_thread` instance variable. It then starts the thread.
 >>
->> The `_receive_loop` method of `NetworkManager` is a `while` loop that continuously calls the `encryption.utils.receive` function, gets the event type from the "cmd" key of the received data, gets the handler list for the event type from the `event_handlers` instance variable, and calls each handler in sequence with the received data as an argument. It returns `None`.
+>> The `_receive_loop` method of `NetworkManager` is a `while` loop that continuously calls the `encryption.utils.receive` function, gets the event type from the "command" key of the received data, gets the handler list for the event type from the `event_handlers` instance variable, and calls each handler in sequence with the received data as an argument. It returns `None`.
 
 ## Encryption utility functions
 

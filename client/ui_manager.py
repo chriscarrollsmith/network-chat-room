@@ -72,6 +72,48 @@ class LoginWindow:
             messagebox.showerror("Error", f"Failed to create login window: {str(e)}")
             raise e
 
+    # --- Window setup and teardown ---
+
+    def show(self):
+        self.window.mainloop()
+        try:
+            self.network_manager.clear_event_handlers()
+            if not self.authed:
+                self.network_manager.close_connection()
+            self.destroy()
+            return self.authed
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to close login window: {str(e)}")
+
+    def destroy(self):
+        try:
+            self.window.destroy()
+        except:
+            pass
+
+    # --- Outgoing server command triggers ---
+
+    def login(self) -> None:
+        # To get value of tk.StringVar, use .get()
+        username: str = self.username.get()
+        password: str = self.password.get()
+        try:
+            self.network_manager.send(
+                {"command": "login", "username": username, "password": password}
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to send login request: {str(e)}")
+
+    def register(self) -> None:
+        # To get value of tk.StringVar, use .get()
+        username: str = self.username.get()
+        password: str = self.password.get()
+        self.network_manager.send(
+            {"command": "register", "username": username, "password": password}
+        )
+
+    # --- Incoming event handlers ---
+
     def handle_register_result(self, data: dict) -> None:
         try:
             if data.get("response") == "ok":
@@ -99,42 +141,6 @@ class LoginWindow:
                 raise Exception("Invalid response from server.")
         except Exception as e:
             messagebox.showerror("Error", f"Login failed: {str(e)}")
-
-    def login(self) -> None:
-        # To get value of tk.StringVar, use .get()
-        username: str = self.username.get()
-        password: str = self.password.get()
-        try:
-            self.network_manager.send(
-                {"cmd": "login", "username": username, "password": password}
-            )
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to send login request: {str(e)}")
-
-    def register(self) -> None:
-        # To get value of tk.StringVar, use .get()
-        username: str = self.username.get()
-        password: str = self.password.get()
-        self.network_manager.send(
-            {"cmd": "register", "username": username, "password": password}
-        )
-
-    def show(self):
-        self.window.mainloop()
-        try:
-            self.network_manager.clear_event_handlers()
-            if not self.authed:
-                self.network_manager.close_connection()
-            self.destroy()
-            return self.authed
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to close login window: {str(e)}")
-
-    def destroy(self):
-        try:
-            self.window.destroy()
-        except:
-            pass
 
 
 class MainWindow:
@@ -218,20 +224,19 @@ class MainWindow:
             self.name.set(f"Welcome, {self.network_manager.username or 'User'}")
 
             # Register event handlers
-            # TODO: Make this a method or create an EventManager class
             # TODO: Create an event handler class to enforce the event system's API?
+            # TODO: Create pydantic models for event requests and responses
             # TODO: Redefine event handler API and network_manager._receive_loop to pass output from previous handler as an argument for next?
             # (Allows separation of data extraction and processing steps from UI updates)
             self.network_manager.add_event_handler(
-                "message_received", self.receive_message
+                "message_received", self.handle_receive_message
             )
             self.network_manager.add_event_handler(
                 "file_request", self.handle_file_request
             )
             self.network_manager.add_event_handler(
-                "file_accept", self.handle_file_accept
+                "file_response", self.handle_file_response
             )
-            self.network_manager.add_event_handler("file_deny", self.handle_file_deny)
             self.network_manager.add_event_handler("peer_left", self.handle_peer_left)
             self.network_manager.add_event_handler(
                 "peer_joined", self.handle_peer_joined
@@ -244,6 +249,8 @@ class MainWindow:
             messagebox.showerror("Error", f"Failed to create main window: {str(e)}")
             raise e
 
+    # --- Window setup and teardown ---
+
     def show(self) -> None:
         self.window.mainloop()
         self.network_manager.close_connection()
@@ -255,20 +262,7 @@ class MainWindow:
         except:
             pass
 
-    def on_user_select(self, event: tk.Event) -> None:
-        selection = self.user_list.curselection()
-        if selection:
-            index = selection[0]
-            value = self.user_list.get(index)
-            selected_user = value.split(" (")[0]  # Remove the (*) if present
-            self.current_chat.set(f"Chatting with: {selected_user}")
-            # Set current session to empty string for global chat, otherwise to selected user
-            self.current_session = (
-                "" if selected_user == "Global Chat Room" else selected_user
-            )
-            # Clear unread indicator for the selected user
-            self.network_manager.send({"cmd": "read", "peer": self.current_session})
-            self.update_user_list({self.current_session: False})
+    # --- UI control ---
 
     def update_user_list(self, users: dict[str, bool]) -> None:
         selected = self.user_list.curselection()
@@ -280,6 +274,40 @@ class MainWindow:
             self.user_list.insert(tk.END, name)
         if selected:
             self.user_list.selection_set(selected)
+
+    def append_message(self, sender: str, time: str, msg: str) -> None:
+        self.history["state"] = "normal"
+        self.history.insert(tk.END, f"{sender} - {time}\n")
+        self.history.insert(tk.END, f"{msg}\n\n", "text")
+        self.history.see(tk.END)
+        self.history["state"] = "disabled"
+
+    def show_file_receive_dialog(self, peer: str, filename: str, size: int) -> bool:
+        messagebox.showinfo(
+            "File Received", f"{peer} has sent you a file: {filename} ({size} bytes)"
+        )
+        return messagebox.askyesno(
+            "Accept File", f"Do you want to accept the file from {peer}?"
+        )
+
+    # --- Outgoing server command triggers ---
+
+    def on_user_select(self, event: tk.Event) -> None:
+        selection = self.user_list.curselection()
+        if selection:
+            index = selection[0]
+            value = self.user_list.get(index)
+            selected_user = value.split(" (")[0]
+            self.current_chat.set(f"Chatting with: {selected_user}")
+
+            # Set current session to empty string for global chat, otherwise to selected user
+            self.current_session = (
+                "" if selected_user == "Global Chat Room" else selected_user
+            )
+
+            # Clear unread indicator for the selected user
+            self.network_manager.send({"command": "read", "peer": self.current_session})
+            self.update_user_list({self.current_session: False})
 
     def send_message(self) -> None:
         try:
@@ -294,7 +322,11 @@ class MainWindow:
 
                 # Send the message to the server
                 self.network_manager.send(
-                    {"cmd": "chat", "peer": self.current_session, "message": message}
+                    {
+                        "command": "chat",
+                        "peer": self.current_session,
+                        "message": message,
+                    }
                 )
 
                 # Clear the input field after sending
@@ -305,7 +337,15 @@ class MainWindow:
         except Exception as e:
             messagebox.showerror("Error", f"Error sending message: {str(e)}")
 
-    def receive_message(self, data: dict) -> None:
+    def send_file(self) -> None:
+        try:
+            self.file_manager.send_file_request(self.current_chat.get())
+        except Exception as e:
+            messagebox.showerror("Error", f"Error sending file: {str(e)}")
+
+    # --- Incoming event handlers ---
+
+    def handle_receive_message(self, data: dict) -> None:
         """
         Handle incoming chat messages.
 
@@ -324,30 +364,11 @@ class MainWindow:
         if sender != self.current_session:
             self.update_user_list({sender: True})
 
-    def append_message(self, sender: str, time: str, msg: str) -> None:
-        self.history["state"] = "normal"
-        self.history.insert(tk.END, f"{sender} - {time}\n")
-        self.history.insert(tk.END, f"{msg}\n\n", "text")
-        self.history.see(tk.END)
-        self.history["state"] = "disabled"
-
-    def send_file(self) -> None:
-        try:
-            self.file_manager.send_file_request(self.current_chat.get())
-        except Exception as e:
-            messagebox.showerror("Error", f"Error sending file: {str(e)}")
-
-    def show_file_receive_dialog(self, peer: str, filename: str, size: int) -> bool:
-        messagebox.showinfo(
-            "File Received", f"{peer} has sent you a file: {filename} ({size} bytes)"
-        )
-        return messagebox.askyesno(
-            "Accept File", f"Do you want to accept the file from {peer}?"
-        )
-
     def handle_file_request(self, data: dict) -> None:
         if self.show_file_receive_dialog(data["peer"], data["filename"], data["size"]):
-            self.network_manager.send({"cmd": "file_accept", "peer": data["peer"]})
+            self.network_manager.send(
+                {"command": "file_response", "peer": data["peer"], "response": "accept"}
+            )
             try:
                 total_bytes, transfer_time = self.file_manager.receive_file_data(
                     data["filename"]
@@ -359,21 +380,23 @@ class MainWindow:
             except Exception as e:
                 messagebox.showerror("Error", f"Error receiving file: {str(e)}")
         else:
-            self.network_manager.send({"cmd": "file_deny", "peer": data["peer"]})
-
-    def handle_file_accept(self, data: dict) -> None:
-        try:
-            bytes_sent, transfer_time = self.file_manager.send_file_data(data)
-            messagebox.showinfo(
-                "Info",
-                f"File sent: {bytes_sent} bytes to {data['peer']} in {transfer_time:.2f} seconds",
+            self.network_manager.send(
+                {"command": "file_response", "peer": data["peer"], "response": "deny"}
             )
-        except Exception as e:
-            messagebox.showerror("Error", f"Error sending file: {str(e)}")
 
-    def handle_file_deny(self) -> None:
-        messagebox.showinfo("Info", "File transfer denied by recipient")
-        self.file_manager._reset_file_state()
+    def handle_file_response(self, data: dict) -> None:
+        if data["response"] == "accept":
+            try:
+                bytes_sent, transfer_time = self.file_manager.send_file_data(data)
+                messagebox.showinfo(
+                    "Info",
+                    f"File sent: {bytes_sent} bytes to {data['peer']} in {transfer_time:.2f} seconds",
+                )
+            except Exception as e:
+                messagebox.showerror("Error", f"Error sending file: {str(e)}")
+        else:
+            messagebox.showinfo("Info", "File transfer denied by recipient")
+            self.file_manager._reset_file_state()
 
     def handle_peer_joined(self, data: dict) -> None:
         """

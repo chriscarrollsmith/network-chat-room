@@ -37,8 +37,7 @@ class Agent:
             "login_result": [self.handle_login_result],
             "message": [self.handle_receive_message],
             "file_request": [self.handle_file_request],
-            "file_accept": [self.handle_file_accept],
-            "file_deny": [self.handle_file_deny],
+            "file_response": [self.handle_file_response],
             "peer_joined": [self.handle_peer_joined],
             "peer_left": [self.handle_peer_left],
         }
@@ -139,7 +138,7 @@ class Agent:
         if not self.connected or self.socket is None:
             raise ConnectionError("Lost connection to the server.")
 
-        self.send({"cmd": type, "username": username, "password": password})
+        self.send({"command": type, "username": username, "password": password})
 
     def send_file_request(self) -> None:
         filename: str = "testfile.txt"
@@ -152,7 +151,7 @@ class Agent:
 
         self.send(
             {
-                "cmd": "file_request",
+                "command": "file_request",
                 "peer": self.current_session,
                 "filename": self._filename_short,
                 "size": size_str,
@@ -270,7 +269,7 @@ class Agent:
 
         # Reply to the incoming message
         reply = f"Hello, {sender}"
-        self.send({"cmd": "chat", "peer": sender, "message": reply})
+        self.send({"command": "chat", "peer": sender, "message": reply})
         logger.info(f"Replied to {sender}: {reply}")
 
     def handle_file_request(self, data: dict) -> None:
@@ -279,8 +278,8 @@ class Agent:
         size = data.get("size", "Unknown")
         logger.info(f"File request received from {peer}: {filename} ({size} bytes)")
 
-        # For this automated agent, we'll always accept file transfers
-        self.send({"cmd": "file_accept", "peer": peer})
+        # For this automated agent, we'll always accept file transfers (change to "deny" to reject)
+        self.send({"command": "file_response", "peer": peer, "response": "accept"})
         logger.info(f"Accepted file transfer from {peer}")
 
         try:
@@ -291,19 +290,27 @@ class Agent:
         except Exception as e:
             logger.error(f"Error receiving file: {str(e)}")
 
-    def handle_file_accept(self, data: dict) -> None:
-        try:
-            peer = data.get("peer", "Unknown")
-            bytes_sent, transfer_time = self.send_file_data(data)
-            logger.info(
-                f"File sent: {bytes_sent} bytes to {peer} in {transfer_time:.2f} seconds"
-            )
-        except Exception as e:
-            logger.error(f"Error sending file: {str(e)}")
+    def handle_file_response(self, data: dict) -> None:
+        response = data.get("response", "")
+        peer = data.get("peer", "")
 
-    def handle_file_deny(self) -> None:
-        logger.info("File transfer denied by recipient")
-        self._reset_file_state()
+        if response == "accept":
+            logger.info(f"File transfer accepted by {peer}")
+            try:
+                bytes_sent, transfer_time = self.send_file_data(data)
+                logger.info(
+                    f"File sent: {bytes_sent} bytes to {peer} in {transfer_time:.2f} seconds"
+                )
+            except:
+                logger.error(f"Error sending file to {peer}")
+        elif response == "deny":
+            try:
+                logger.info("File transfer denied by recipient")
+                self._reset_file_state()
+            except:
+                logger.error(f"Error sending file to {peer}")
+        else:
+            logger.error(f"Invalid file response from {peer}: {response}")
 
     def handle_peer_joined(self, data: dict) -> None:
         """
@@ -351,7 +358,7 @@ if __name__ == "__main__":
         while not app.authed:
             time.sleep(1)
 
-        app.send({"cmd": "message", "peer": "", "message": "Hello, world!"})
+        app.send({"command": "message", "peer": "", "message": "Hello, world!"})
 
         time.sleep(60)
 

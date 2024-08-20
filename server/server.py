@@ -95,13 +95,13 @@ class Handler(socketserver.BaseRequestHandler):
         self.username = data.get("username", "")
         logger.debug(f"Handling authentication for user: {self.username}")
 
-        if data.get("cmd") == "login":
+        if data.get("command") == "login":
             self._process_login(data)
-        elif data.get("cmd") == "register":
+        elif data.get("command") == "register":
             logger.debug("Received register command")
             self._process_registration(data)
         else:
-            logger.warning(f"Unknown authentication command: {data.get('cmd')}")
+            logger.warning(f"Unknown authentication command: {data.get('command')}")
 
     def _process_login(self, data: dict[str, str]) -> None:
         login_result: dict[str, str] = {
@@ -182,18 +182,17 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing the command and its parameters.
         """
-        cmd_handlers: dict[str, Callable[[dict[str, str]], None]] = {
+        command_handlers: dict[str, Callable[[dict[str, str]], None]] = {
             "get_users": self._handle_get_users,
             "get_history": self._handle_get_history,
             "chat": self._handle_chat,
             "file_request": self._handle_file_request,
-            "file_deny": self._handle_file_deny,
-            "file_accept": self._handle_file_accept,
+            "file_response": self._handle_file_response,
             "close": self._handle_close,
         }
 
-        command: str = data.get("cmd", "")
-        handler = cmd_handlers.get(command)
+        command: str = data.get("command", "")
+        handler = command_handlers.get(command)
         if handler:
             try:
                 handler(data)
@@ -286,7 +285,6 @@ class Handler(socketserver.BaseRequestHandler):
                     )
         self.chat_history.append_to_history(self.username, "", data["message"])
 
-    # TODO: Use a different key (e.g., "status") for success/failure, not a separate error event type
     def _handle_file_request(self, data: dict[str, str]) -> None:
         """
         Handle file transfer requests.
@@ -308,6 +306,7 @@ class Handler(socketserver.BaseRequestHandler):
                     },
                 )
             else:
+                # TODO: Use a different key (e.g., "status") for success/failure, not a separate error event type?
                 send(
                     self.request,
                     {
@@ -316,37 +315,25 @@ class Handler(socketserver.BaseRequestHandler):
                     },
                 )
 
-    def _handle_file_deny(self, data: dict[str, str]) -> None:
+    def _handle_file_response(self, data: dict[str, str]) -> None:
         """
-        Handle file transfer denials.
+        Handle file transfer responses (accept or deny).
 
         Args:
-            data (dict): The received data containing file transfer denial information.
+            data (dict): The received data containing file transfer response information.
         """
         if data["peer"] == self.file_peer:
             self.file_peer = ""
             with Handler.clients_lock:
                 if data["peer"] in Handler.clients:
-                    send(
-                        Handler.clients[data["peer"]].request,
-                        {"type": "file_deny", "peer": self.username},
-                    )
-
-    def _handle_file_accept(self, data: dict[str, str]) -> None:
-        """
-        Handle file transfer acceptances.
-
-        Args:
-            data (dict): The received data containing file transfer acceptance information.
-        """
-        if data["peer"] == self.file_peer:
-            self.file_peer = ""
-            with Handler.clients_lock:
-                if data["peer"] in Handler.clients:
-                    send(
-                        Handler.clients[data["peer"]].request,
-                        {"type": "file_accept", "ip": self.client_address[0]},
-                    )
+                    response = {
+                        "type": "file_response",
+                        "peer": self.username,
+                        "response": data["response"],
+                    }
+                    if data["response"] == "accept":
+                        response["ip"] = self.client_address[0]
+                    send(Handler.clients[data["peer"]].request, response)
 
     def _handle_close(self, data: dict[str, str]) -> None:
         """
