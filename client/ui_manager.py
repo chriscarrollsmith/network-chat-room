@@ -229,7 +229,10 @@ class MainWindow:
             # TODO: Redefine event handler API and network_manager._receive_loop to pass output from previous handler as an argument for next?
             # (Allows separation of data extraction and processing steps from UI updates)
             self.network_manager.add_event_handler(
-                "message_received", self.handle_receive_message
+                "private_message", self.handle_receive_message
+            )
+            self.network_manager.add_event_handler(
+                "broadcast_message", self.handle_receive_message
             )
             self.network_manager.add_event_handler(
                 "file_request", self.handle_file_request
@@ -275,10 +278,37 @@ class MainWindow:
         if selected:
             self.user_list.selection_set(selected)
 
-    def append_message(self, sender: str, time: str, msg: str) -> None:
+    def append_message(
+        self, sender: str, time: str, msg: str, message_type: str = "global"
+    ) -> None:
         self.history["state"] = "normal"
-        self.history.insert(tk.END, f"{sender} - {time}\n")
-        self.history.insert(tk.END, f"{msg}\n\n", "text")
+
+        # Add tags for different message types
+        self.history.tag_configure("private", foreground="blue")
+        self.history.tag_configure("global", foreground="green")
+        self.history.tag_configure("system", foreground="red")
+
+        # Determine message type indicator
+        if message_type == "private":
+            if sender == "You":
+                type_indicator = f"(To {self.current_session})"
+            else:
+                type_indicator = "(To you)"
+            tag = "private"
+        elif message_type == "global":
+            type_indicator = "(To everyone)"
+            tag = "global"
+        elif message_type == "system":
+            type_indicator = ""
+            tag = "system"
+        else:
+            type_indicator = ""
+            tag = ""
+
+        # Insert the message with appropriate formatting
+        self.history.insert(tk.END, f"{sender} {type_indicator} - {time}\n", tag)
+        self.history.insert(tk.END, f"{msg}\n\n")
+
         self.history.see(tk.END)
         self.history["state"] = "disabled"
 
@@ -333,7 +363,8 @@ class MainWindow:
                 self.msg.set("")
 
                 # Update the UI with the sent message
-                self.append_message("You", timestamp, message)
+                message_type = "private" if self.current_session else "global"
+                self.append_message("You", timestamp, message, message_type)
         except Exception as e:
             messagebox.showerror("Error", f"Error sending message: {str(e)}")
 
@@ -353,12 +384,17 @@ class MainWindow:
             data (dict): A dictionary containing message data.
         """
         # Extract message details from the data
+        message_type: str = data.get("type", "broadcast_message")
         sender: str = data.get("peer", "Unknown")
         message: str = data.get("message", "")
         timestamp: str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
-        # Display the received message in the UI
-        self.append_message(sender, timestamp, message)
+        if message_type == "private_message":
+            # Display the received private message in the UI
+            self.append_message(sender, timestamp, message, "private")
+        elif message_type == "broadcast_message":
+            # Display the received global message in the UI
+            self.append_message(sender, timestamp, message, "global")
 
         # Handle the case where message is not from the current session
         if sender != self.current_session:
@@ -414,6 +450,7 @@ class MainWindow:
                 "System",
                 time.strftime("%Y-%m-%d %H:%M:%S"),
                 f"{peer} has joined the chat.",
+                "system",
             )
 
     def handle_peer_left(self, data: dict) -> None:
@@ -439,6 +476,7 @@ class MainWindow:
                 "System",
                 time.strftime("%Y-%m-%d %H:%M:%S"),
                 f"{peer} has left the chat.",
+                "system",
             )
 
             # If the current chat was with the peer who left, switch to global chat

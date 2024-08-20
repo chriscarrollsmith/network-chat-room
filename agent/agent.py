@@ -16,7 +16,6 @@ configure_logger()
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add event handling for received data
 class Agent:
     """Automated agent that can be used to interact with the server for testing purposes"""
 
@@ -35,7 +34,8 @@ class Agent:
         self.event_handlers: dict[str, list[Callable]] = {
             "register_result": [self.handle_register_result],
             "login_result": [self.handle_login_result],
-            "message": [self.handle_receive_message],
+            "private_message": [self.handle_receive_message],
+            "broadcast_message": [self.handle_receive_message],
             "file_request": [self.handle_file_request],
             "file_response": [self.handle_file_response],
             "peer_joined": [self.handle_peer_joined],

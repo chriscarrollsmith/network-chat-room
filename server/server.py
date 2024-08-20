@@ -256,7 +256,7 @@ class Handler(socketserver.BaseRequestHandler):
                 send(
                     Handler.clients[data["peer"]].request,
                     {
-                        "type": "message_received",
+                        "type": "private_message",
                         "peer": self.username,
                         "message": data["message"],
                     },
@@ -278,7 +278,7 @@ class Handler(socketserver.BaseRequestHandler):
                     send(
                         Handler.clients[user].request,
                         {
-                            "type": "broadcast",
+                            "type": "broadcast_message",
                             "peer": self.username,
                             "message": data["message"],
                         },
