@@ -209,7 +209,7 @@ class MainWindow:
             self.btn_send.pack(side=tk.LEFT, padx=(0, 5))
 
             self.btn_file: tk.Button = tk.Button(
-                bottom_frame, text="Send File", command=lambda: self.send_file("")
+                bottom_frame, text="Send File", command=self.send_file
             )
             self.btn_file.pack(side=tk.LEFT)
             self.btn_file.configure(state="disabled")
