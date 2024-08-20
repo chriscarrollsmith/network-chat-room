@@ -256,7 +256,7 @@ class Agent:
 
         # Reply to the incoming message
         reply = f"Hello, {sender}"
-        self.send({"cmd": "message", "peer": sender, "message": reply})
+        self.send({"cmd": "chat", "peer": sender, "message": reply})
         logger.info(f"Replied to {sender}: {reply}")
 
     def handle_file_request(self, data: dict) -> None:
