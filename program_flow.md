@@ -44,7 +44,7 @@ The Handler class's `setup` method creates empty `user`, `file_peer`, and `authe
 
 When we start the client with `python -m client.app`, it creates an instance of the `Client` class at 127.0.0.1:8888.
 
-The `__init__` method of the `Client` class creates `UIManager`, `NetworkManager`, `ChatManager`, and `FileManager` instances and assigns them to the `ui_manager`, `network_manager`, `chat_manager`, and `file_manager` attributes, respectively:
+The `__init__` method of the `Client` class creates `UIManager`, `NetworkManager`, `ChatManager`, and `FileManager` instances and assigns them to the `ui_manager`, `network_manager` and `file_manager` attributes, respectively:
 
 > ### UIManager initialization
 >
@@ -84,7 +84,7 @@ The `run` method first calls the `connect` method on the `NetworkManager` to con
 
 If the connection fails, `run` displays an error message box and returns `None`; otherwise it calls the `show_login` method of the `ui_manager` to start the login window loop. It passes the `network_manager` as an argument and assigns the return value to the `login_successful` variable.
 
-If the `login_successful` variable is `True`, it calls the `show_main` method of the `ui_manager` to start the main UI window loop. It passes the `network_manager`, `chat_manager`, and `file_manager` as arguments.
+If the `login_successful` variable is `True`, it calls the `show_main` method of the `ui_manager` to start the main UI window loop. It passes the `network_manager` and `file_manager` as arguments.
 
 After starting the main window loop, `run` uses the `NetworkManager`'s `add_event_handler` method to register some `UIManager` methods as event handlers for each event type ("receive_message", "update_user_list", "file_request"). (Registering the handlers in a separate step after initialization prevents circular imports between the `NetworkManager` and `UIManager`.)
 

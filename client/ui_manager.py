@@ -3,7 +3,6 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Optional
 from client.network_manager import NetworkManager
-from client.chat_manager import ChatManager
 from client.file_manager import FileManager
 
 
@@ -144,13 +143,13 @@ class MainWindow:
     def __init__(
         self,
         network_manager: NetworkManager,
-        chat_manager: ChatManager,
         file_manager: FileManager,
     ) -> None:
         try:
             self.network_manager: NetworkManager = network_manager
-            self.chat_manager: ChatManager = chat_manager
             self.file_manager: FileManager = file_manager
+
+            self.current_session: str = ""
 
             self.window: tk.Tk = tk.Tk()
             self.window.title("Chat Room")
@@ -268,14 +267,12 @@ class MainWindow:
             selected_user = value.split(" (")[0]  # Remove the (*) if present
             self.current_chat.set(f"Chatting with: {selected_user}")
             # Set current session to empty string for global chat, otherwise to selected user
-            self.chat_manager.current_session = (
+            self.current_session = (
                 "" if selected_user == "Global Chat Room" else selected_user
             )
             # Clear unread indicator for the selected user
-            self.network_manager.send(
-                {"cmd": "read", "peer": self.chat_manager.current_session}
-            )
-            self.update_user_list({self.chat_manager.current_session: False})
+            self.network_manager.send({"cmd": "read", "peer": self.current_session})
+            self.update_user_list({self.current_session: False})
 
     def update_user_list(self, users: dict[str, bool]) -> None:
         selected = self.user_list.curselection()
@@ -288,9 +285,27 @@ class MainWindow:
         if selected:
             self.user_list.selection_set(selected)
 
-    def send_message(self, message: str) -> None:
+    def send_message(self) -> None:
         try:
-            self.chat_manager.send_message(message, self.append_message)
+            message = self.msg.get()
+            if message:
+                # Ignore empty messages
+                if not message.strip():
+                    return
+
+                # Generate timestamp for the message
+                timestamp: str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+                # Send the message to the server
+                self.network_manager.send(
+                    {"cmd": "chat", "peer": self.current_session, "message": message}
+                )
+
+                # Clear the input field after sending
+                self.msg.set("")
+
+                # Update the UI with the sent message
+                self.append_message("You", timestamp, message)
         except Exception as e:
             messagebox.showerror("Error", f"Error sending message: {str(e)}")
 
@@ -310,7 +325,7 @@ class MainWindow:
         self.append_message(sender, timestamp, message)
 
         # Handle the case where message is not from the current session
-        if sender != self.chat_manager.current_session:
+        if sender != self.current_session:
             self.update_user_list({sender: True})
 
     def append_message(self, sender: str, time: str, msg: str) -> None:
@@ -408,6 +423,6 @@ class MainWindow:
             )
 
             # If the current chat was with the peer who left, switch to global chat
-            if self.chat_manager.current_session == peer:
-                self.chat_manager.current_session = ""
+            if self.current_session == peer:
+                self.current_session = ""
                 self.current_chat.set("Global Chat Room")

@@ -2,7 +2,6 @@ import logging
 from tkinter import messagebox
 from client.network_manager import NetworkManager
 from client.ui_manager import UIManager, LoginWindow, MainWindow
-from client.chat_manager import ChatManager
 from client.file_manager import FileManager
 from utils.logger import configure_logger
 
@@ -18,7 +17,6 @@ class Client:
     def __init__(self, server_ip: str, server_port: int):
         self.ui_manager = UIManager()
         self.network_manager = NetworkManager(server_ip, server_port)
-        self.chat_manager = ChatManager(self.network_manager)
         self.file_manager = FileManager(self.network_manager)
 
     def run(self) -> None:
@@ -42,7 +40,7 @@ class Client:
 
         # Initialize main window
         self.ui_manager.main_window = MainWindow(
-            self.network_manager, self.chat_manager, self.file_manager
+            self.network_manager, self.file_manager
         )
 
         # Show main window
