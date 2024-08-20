@@ -81,7 +81,7 @@ class LoginWindow:
                 messagebox.showinfo(
                     "Success", "Registration successful. You can now log in."
                 )
-            elif data.get("response") == "failed":
+            elif data.get("response") == "fail":
                 messagebox.showerror(
                     "Error", f"Registration failed: {data.get('reason')}"
                 )
@@ -96,7 +96,7 @@ class LoginWindow:
                 self.authed = True
                 self.network_manager.username = data.get("username")
                 self.window.quit()
-            elif data.get("response") == "failed":
+            elif data.get("response") == "fail":
                 messagebox.showerror("Error", f"Login failed: {data.get('reason')}")
             else:
                 raise Exception("Invalid response from server.")

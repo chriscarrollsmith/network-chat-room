@@ -221,23 +221,25 @@ class Agent:
     def handle_register_result(self, data: dict) -> None:
         if data.get("response") == "ok":
             logger.info(f"Registration successful for {data.get('username')}")
-        elif data.get("response") == "failed":
+        elif data.get("response") == "fail":
             if data.get("reason") == "Username already exists!":
-                self.registered = True
                 logger.info(f"User {data.get('username')} already registered")
             else:
                 raise Exception(f"Registration failed: {data.get('reason')}")
         else:
             raise Exception("Invalid response from server.")
 
+        self.registered = True
+
     def handle_login_result(self, data: dict) -> None:
         if data.get("response") == "ok":
-            self.authed = True
             logger.info(f"Login successful for {data.get('username')}")
-        elif data.get("response") == "failed":
+        elif data.get("response") == "fail":
             raise Exception(f"Login failed: {data.get('reason')}")
         else:
             raise Exception("Invalid response from server.")
+
+        self.authed = True
 
     def handle_receive_message(self, data: dict) -> None:
         """
