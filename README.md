@@ -1,6 +1,6 @@
 # Network Chat Room
 
-A Python-based AIM (AOL Instant Messenger)-style desktop chat room application, based on rihothy's[socket-chat-room](https://github.com/rihothy/socket-chat-room), using Tkinter for GUI and sockets for network communication.
+A Python-based AIM (AOL Instant Messenger)-style desktop chat room application, based on [rihothy](https://github.com/rihothy)'s [socket-chat-room](https://github.com/rihothy/socket-chat-room), using Tkinter for GUI and sockets for network communication.
 
 ## Purpose
 
