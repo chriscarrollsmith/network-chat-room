@@ -259,10 +259,12 @@ class Handler(socketserver.BaseRequestHandler):
                     {
                         "type": "message_received",
                         "peer": self.username,
-                        "msg": data["msg"],
+                        "message": data["message"],
                     },
                 )
-        self.chat_history.append_to_history(self.username, data["peer"], data["msg"])
+        self.chat_history.append_to_history(
+            self.username, data["peer"], data["message"]
+        )
 
     def _handle_broadcast_chat(self, data: dict[str, str]) -> None:
         """
@@ -279,10 +281,10 @@ class Handler(socketserver.BaseRequestHandler):
                         {
                             "type": "broadcast",
                             "peer": self.username,
-                            "msg": data["msg"],
+                            "message": data["message"],
                         },
                     )
-        self.chat_history.append_to_history(self.username, "", data["msg"])
+        self.chat_history.append_to_history(self.username, "", data["message"])
 
     # TODO: Use a different key (e.g., "status") for success/failure, not a separate error event type
     def _handle_file_request(self, data: dict[str, str]) -> None:
