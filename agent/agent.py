@@ -83,6 +83,15 @@ class Agent:
                     f"Expected receive thread to not be alive but it was."
                 )
 
+    def connect(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
+        self.connected = True
+        self.receive_thread = threading.Thread(target=self.receive_loop)
+        self.receive_thread.start()
+
+        self.validate_connection_state(should_be_connected=True)
+
     # In the close method:
     def close(self) -> None:
         self.connected = False
