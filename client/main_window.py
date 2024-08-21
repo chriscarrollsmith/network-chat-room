@@ -71,6 +71,7 @@ class MainWindow:
 
             self.entry_msg: tk.Entry = tk.Entry(bottom_frame, textvariable=self.msg)
             self.entry_msg.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+            self.entry_msg.bind("<Return>", self.send_message)
 
             self.btn_send: tk.Button = tk.Button(
                 bottom_frame, text="Send", command=self.send_message
