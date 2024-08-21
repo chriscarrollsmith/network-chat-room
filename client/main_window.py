@@ -96,6 +96,8 @@ class MainWindow:
 
             self.network_manager.validate_connection_state(should_be_connected=True)
 
+            self.get_online_users()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create main window: {str(e)}")
             raise e
@@ -112,6 +114,7 @@ class MainWindow:
             "file_response": self.handle_file_response,
             "peer_left": self.handle_peer_left,
             "peer_joined": self.handle_peer_joined,
+            "get_users": self.handle_get_users,
         }
 
         for event, handler in event_handlers.items():
@@ -130,7 +133,7 @@ class MainWindow:
 
     # --- UI control ---
 
-    def update_user_list(self, users: dict[str, bool]) -> None:
+    def update_user_list(self, users: list[dict[str, bool]]) -> None:
         selected = self.user_list.curselection()
         self.user_list.delete(0, tk.END)
         for user, has_unread in users.items():
@@ -184,6 +187,9 @@ class MainWindow:
         )
 
     # --- Outgoing server command triggers ---
+
+    def get_online_users(self) -> None:
+        self.network_manager.send({"command": "get_users"})
 
     def switch_chat_session(self, event: tk.Event) -> None:
         selection = self.user_list.curselection()
@@ -240,6 +246,17 @@ class MainWindow:
             messagebox.showerror("Error", f"Error sending file: {str(e)}")
 
     # --- Incoming event handlers ---
+
+    def handle_get_users(self, data: dict) -> None:
+        """
+        Handle the event when the server sends a list of online users.
+
+        Args:
+            data (dict): A dictionary containing the list of online users.
+        """
+        users: list[str] = data.get("data", [])
+        current_users: dict = {user: False for user in users}
+        self.update_user_list(current_users)
 
     def handle_receive_message(self, data: dict) -> None:
         """
