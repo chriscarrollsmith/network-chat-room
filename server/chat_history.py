@@ -1,25 +1,13 @@
 import pickle
 import time
+from threading import Lock
 
 
 class ChatHistory:
     def __init__(self) -> None:
-        self.history: dict[tuple[str, str], list[tuple[str, str, str]]] = (
-            self.load_history()
-        )
-
-    def load_history(self) -> dict[tuple[str, str], list[tuple[str, str, str]]]:
-        """
-        Load chat history from a file.
-
-        Returns:
-            A dictionary containing chat history, or an empty dictionary if the file doesn't exist.
-        """
-        try:
-            with open("history.dat", "rb") as f:
-                return pickle.load(f)
-        except (FileNotFoundError, pickle.UnpicklingError):
-            return {}
+        self.history: dict[tuple[str, str], list[tuple[str, str, str]]] = {}
+        self.lock = Lock()
+        self.load_history()
 
     def get_chat_identifier(self, u1: str, u2: str) -> tuple[str, str]:
         """
@@ -43,16 +31,21 @@ class ChatHistory:
             receiver: The username of the message receiver, or an empty string for broadcast messages.
             msg: The message content.
         """
-        key = ("", "") if receiver == "" else self.get_chat_identifier(sender, receiver)
+        with self.lock:
+            key = (
+                ("", "")
+                if receiver == ""
+                else self.get_chat_identifier(sender, receiver)
+            )
 
-        if key not in self.history:
-            self.history[key] = []
+            if key not in self.history:
+                self.history[key] = []
 
-        self.history[key].append(
-            (sender, time.strftime("%m/%d %H:%M", time.localtime()), msg)
-        )
+            self.history[key].append(
+                (sender, time.strftime("%m/%d %H:%M", time.localtime()), msg)
+            )
 
-        self.save_history()
+            self.save_history()
 
     def get_history(self, sender: str, receiver: str) -> list[tuple[str, str, str]]:
         """
@@ -66,12 +59,32 @@ class ChatHistory:
             A list of tuples containing chat history entries, each containing a sender, a
             timestamp, and a message.
         """
-        key = ("", "") if receiver == "" else self.get_chat_identifier(sender, receiver)
-        return self.history.get(key, [])
+        with self.lock:
+            key = (
+                ("", "")
+                if receiver == ""
+                else self.get_chat_identifier(sender, receiver)
+            )
+            return self.history.get(key, [])
 
     def save_history(self) -> None:
         """
         Save chat history to a file.
         """
-        with open("history.dat", "wb") as f:
-            pickle.dump(self.history, f)
+        with self.lock:
+            with open("history.dat", "wb") as f:
+                pickle.dump(self.history, f)
+
+    def load_history(self) -> dict[tuple[str, str], list[tuple[str, str, str]]]:
+        """
+        Load chat history from a file.
+
+        Returns:
+            A dictionary containing chat history, or an empty dictionary if the file doesn't exist.
+        """
+        with self.lock:
+            try:
+                with open("history.dat", "rb") as f:
+                    return pickle.load(f)
+            except (FileNotFoundError, pickle.UnpicklingError):
+                return {}
