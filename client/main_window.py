@@ -201,6 +201,8 @@ class MainWindow:
                 self.user_list.selection_clear(index)
                 self.current_session = ""
                 self.current_chat.set("Global Chat Room")
+                # Disable send file button for global chat
+                self.btn_file.configure(state="disabled")
             else:
                 self.current_chat.set(f"Chatting with: {selected_user}")
                 self.current_session = selected_user
@@ -209,6 +211,8 @@ class MainWindow:
                     {"command": "read", "peer": self.current_session}
                 )
                 self.update_user_list({self.current_session: False})
+                # Enable send file button for private chats
+                self.btn_file.configure(state="normal")
 
     def send_message(self, event: tk.Event = None) -> None:
         try:
