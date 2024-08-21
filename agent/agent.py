@@ -278,17 +278,25 @@ class Agent:
         size = data.get("size", "Unknown")
         logger.info(f"File request received from {peer}: {filename} ({size} bytes)")
 
-        # For this automated agent, we'll always accept file transfers (change to "deny" to reject)
-        self.send({"command": "file_response", "peer": peer, "response": "accept"})
-        logger.info(f"Accepted file transfer from {peer}")
+        # For this automated agent, we'll always deny file transfers (change to "accept" to accept)
+        self.send({"command": "file_response", "peer": peer, "response": "deny"})
+        logger.info(f"Denied file transfer from {peer}")
 
-        try:
-            total_bytes, transfer_time = self.receive_file_data(filename)
-            logger.info(
-                f"File received: {total_bytes} bytes from {peer} in {transfer_time:.2f} seconds"
-            )
-        except Exception as e:
-            logger.error(f"Error receiving file: {str(e)}")
+        self.send(
+            {
+                "command": "chat",
+                "peer": peer,
+                "message": f"Sorry, {peer}, I can't accept files yet.",
+            }
+        )
+
+        # try:
+        #     total_bytes, transfer_time = self.receive_file_data(filename)
+        #     logger.info(
+        #         f"File received: {total_bytes} bytes from {peer} in {transfer_time:.2f} seconds"
+        #     )
+        # except Exception as e:
+        #     logger.error(f"Error receiving file: {str(e)}")
 
     def handle_file_response(self, data: dict) -> None:
         response = data.get("response", "")
