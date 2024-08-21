@@ -187,16 +187,18 @@ class MainWindow:
             index = selection[0]
             value = self.user_list.get(index)
             selected_user = value.split(" (")[0]
-            self.current_chat.set(f"Chatting with: {selected_user}")
-
-            # Set current session to empty string for global chat, otherwise to selected user
-            self.current_session = (
-                "" if selected_user == "Global Chat Room" else selected_user
-            )
-
-            # Clear unread indicator for the selected user
-            self.network_manager.send({"command": "read", "peer": self.current_session})
-            self.update_user_list({self.current_session: False})
+            if selected_user == self.current_session:
+                self.user_list.selection_clear(index)
+                self.current_session = ""
+                self.current_chat.set("Global Chat Room")
+            else:
+                self.current_chat.set(f"Chatting with: {selected_user}")
+                self.current_session = selected_user
+                # Clear unread indicator for the selected user
+                self.network_manager.send(
+                    {"command": "read", "peer": self.current_session}
+                )
+                self.update_user_list({self.current_session: False})
 
     def send_message(self, event: tk.Event = None) -> None:
         try:
