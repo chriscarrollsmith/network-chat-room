@@ -1,3 +1,7 @@
+# TODO: Decide whether we want separate rooms for different users or just one
+# global chat room with tags for private messages (current implementation),
+# in which case "unread" indicator and "read" command are unnecessary
+
 import time
 import tkinter as tk
 from typing import Callable

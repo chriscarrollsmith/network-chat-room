@@ -2,7 +2,7 @@
 
 We are going to iteratively build up a natural language description of our program flow. We will look at one file at a time and only consider the code in that file.
 
-The program has three entry points: the `app.py` file in the `client` module, the `server.py` file in the `server` module, and an `agent.py` file in the agent folder (for spinning up an automated user agent for testing).
+The program has three entry points: the `client.py` file in the `client` module, the `server.py` file in the `server` module, and an `agent.py` file in the `agent` folder (for spinning up an automated user agent for testing).
 
 ## Logger configuration
 
@@ -10,17 +10,17 @@ The first thing in each entrypoint is a function call to `configure_logger` and 
 
 This function first creates a `root` logger set to log messages at the `logging.DEBUG` level and adds a `logger.StreamHandler` to it. It also creates and adds a `logging.Formatter` that includes the timestamp, name, log level, and message.
 
-The function then creates and adds a `queue.Queue` with -1 maxsize (no limit) and a `logging.handlers.QueueHandler` that uses the queue as a buffer. It also creates and starts a `logging.handlers.QueueListener`. Under the hood, the `QueueHandler` will push log records to the queue, and the `QueueListener` will pop them off and pass them to the `StreamHandler`.
+The function then creates and adds a `queue.Queue` with -1 `maxsize` (no limit) and a `logging.handlers.QueueHandler` that uses the queue as a buffer. It also creates and starts a `logging.handlers.QueueListener`. Under the hood, the `QueueHandler` will push log records to the queue, and the `QueueListener` will pop them off and pass them to the `StreamHandler`.
 
-Since `logging.Logger` instances are singletons, we don't return the logger from this function. We run it once at the entrypoint, and all subsequent calls to `logging.getLogger` will inherit the configuration from the root logger.
+Since `logging.Logger` instances are singletons, we don't return the logger from this function. Rather, we run the `configure_logger` function once at the entrypoint, and all subsequent calls to `logging.getLogger` will inherit the configuration from the root logger.
 
-## Server initialization
+## Server `RequestHandler` initialization
 
-When we start the server with `python -m server.server`, it initializes a `socketserver.ThreadingTCPServer` instance that listens for incoming connections on 0.0.0.0:8888 until the server errors or is manually stopped by a keyboard interrupt, at which point it logs a message and closes the server. When initializing the `socketserver.ThreadingTCPServer` server, it passes a `Handler` class (which inherits from `socketserver.BaseRequestHandler`) to the constructor. This class contains methods for managing client connections and handling authentication, chat messages, and file transfers.
+When we start the server with `python -m server.server`, it initializes a `socketserver.ThreadingTCPServer` instance that listens for incoming connections on 0.0.0.0:8888 until the server errors or is manually stopped by a keyboard interrupt, at which point it logs a message and closes the server. When initializing the `socketserver.ThreadingTCPServer` server, it passes a `RequestHandler` class (which inherits from `socketserver.BaseRequestHandler`) to the constructor. This class contains methods for managing client connections and handling authentication, chat messages, and file transfers.
 
-The `socketserver.ThreadingTCPServer` will spin up a new thread and a separate `Handler` instance for each client connection. Class variables (not to be confused with instance variables) are used for synchronization across threads. A `clients_lock` class variable is used as a context manager for thread-safety when accessing the `clients` dictionary, which is a class variable mapping usernames to `Handler` instances. Additionally, the class has a `user_manager` (an instance of `UserManager`) for storing and accessing user records and `chat_history` (an instance of `ChatHistory`) for storing and accessing chat logs. It also defines a constant `max_buff_size` of 1024 (1 KB) as the maximum buffer size for receiving data.
+The `socketserver.ThreadingTCPServer` will spin up a new thread and a separate `RequestHandler` instance for each client connection. Class variables (not to be confused with instance variables) are used for synchronization across threads. A `clients_lock` class variable is used as a context manager for thread-safety when accessing the `clients` dictionary, which is a class variable mapping usernames to `Handler` instances. Additionally, the class has a `user_manager` (an instance of `UserManager`) for storing and accessing user records and `chat_history` (an instance of `ChatHistory`) for storing and accessing chat logs. It also defines a constant `max_buff_size` of 1024 (1 KB) as the maximum buffer size for receiving data.
 
-The Handler class's `setup` method creates empty `user`, `file_peer`, and `authed` instance variables for tracking the current user, the file transfer peer, and the authentication status of the user. This special named method is called by `socketserver.ThreadingTCPServer` when setting up a new thread upon client connection (so you don't have to override the `__init__` method).
+While the class and its variables will be shared across all threads, instances and their variables will be unique to each thread. The `RequestHandler` class's `setup` method creates empty `user`, `file_peer`, and `authed` instance variables for tracking the current user, the file transfer peer, and the authentication status of the user. This is a special named method called by `socketserver.ThreadingTCPServer` when setting up a new thread upon client connection (so you don't have to override the `__init__` method).
 
 > ### UserManager initialization
 >
@@ -34,41 +34,31 @@ The Handler class's `setup` method creates empty `user`, `file_peer`, and `authe
 >
 > The `ChatHistory` class is responsible for server-side management of chat logs. It has methods for saving and loading chat logs to and from a `history.dat` file.
 >
-> Its `__init__` method creates a `threading.lock` for thread safety. It also creates a `history` instance variable for storing the `dict[tuple[str, str], list[tuple[str, str, str]]]` mapping of chat identifiers (username pairs) to chat logs (a list of tuples, each containing a sender, a timestamp, and a message). It calls the `load_history` method to load this `history` dictionary from the `history.dat` file.
+> Its `__init__` method creates a `threading.lock` for thread safety. It also creates a `history` instance variable for storing the `dict[tuple[str, str], list[tuple[str, str, str]]]` mapping of chat identifiers (username pairs) to chat logs (a list of tuples, each containing a sender, a timestamp, and a message). It calls the `load_history` method to load this `history` dictionary from the `history.dat` file (using the lock as a context manager out of an overly conscientious concern for thread safety, even though this method is only called once upon initialization of the class).
 >
 > `load_history` opens the `history.dat` file in binary mode and loads the `history` dictionary using `pickle.load`. If the file does not exist, it creates an empty dictionary.
 
 ## Client initialization
 
-**TODO: Update this section to reflect the new client architecture**
-
 When we start the client with `python -m client.app`, it creates an instance of the `Client` class at 127.0.0.1:8888.
 
-The `__init__` method of the `Client` class creates `UIManager`, `NetworkManager`, `ChatManager`, and `FileManager` instances and assigns them to the `ui_manager`, `network_manager` and `file_manager` attributes, respectively:
+The `__init__` method of the `Client` class creates empty `login_window` and `main_window` instance variables for storing the `Optional[LoginWindow]` and `Optional[MainWindow]` instances, respectively.
 
-> ### UIManager initialization
->
-> The `UIManager` class is responsible for managing the user interface of the client. It has methods for creating and managing the login and main windows.
->
-> The `__init__` method of `UIManager` simply creates empty `login_window` and `main_window` instance variables for storing the `Optional[LoginWindow]` and `Optional[MainWindow]` instances, respectively.
->
+It also creates `NetworkManager` and `FileManager` instances and assigns them to the `network_manager` and `file_manager` attributes:
+
 > ### NetworkManager initialization
 >
-> The `NetworkManager` class is responsible for client-side management of the network communication between the client and the server. It has methods for connecting to the server, sending messages, and handling file transfers.
+> The `NetworkManager` class is responsible for client-side management of the network communication between the client and the server. It has methods for connecting to the server, sending messages, and dispatching incoming server messages to event handlers.
 >
-> The `__init__` method of `NetworkManager` takes the `host` and `port` as arguments and saves them as instance variables. It then creates an empty `socket` (`socket.socket`) instance for the client and sets the `connected` instance variable to `False`. It also sets `max_buff_size` to 1024 (1 KB) and creates an empty `receive_thread` instance variable for storing the `threading.Thread` instance that will handle incoming messages from the server. Finally, it creates an `event_handlers` instance variable for storing the event handlers (`dict[str, list[Callable]]`) for each event. The variable is initialized with a handler for the "unknown" event type that logs an error message.
+> The `__init__` method of `NetworkManager` takes the `host` and `port` as arguments and saves them as instance variables. It then creates an empty `socket` (`socket.socket`) instance for the client and sets the `connected` instance variable to `False`. It also sets `max_buff_size` to 1024 (1 KB) and creates an empty `receive_thread` instance variable for storing the `threading.Thread` instance that will handle incoming messages from the server.
 >
-> ### ChatManager initialization
->
-> The `ChatManager` class is responsible for managing the chat messages between users. It has methods for sending and receiving chat messages, as well as updating the chat history.
->
-> Its `__init__` method takes the `network_manager` as an argument and saves them as instance variables. It also creates an empty `current_session` instance variable for storing the `Optional[str]` peer username of the current chat session.
+> Finally, it creates an empty `username` instance variable for tracking the currently authenticated user and an `event_handlers` instance variable for storing the event handlers (`dict[str, list[Callable]]`) for each event. The latter is initialized with a handler for the "unknown" event type that logs an error message.
 >
 > ### FileManager initialization
 >
-> The `FileManager` class is responsible for managing the file transfers between users. It has methods for sending and receiving files, as well as updating the chat history.
+> The `FileManager` class is responsible for managing file transfers between users. It has methods for sending and receiving file data.
 >
-> Its `__init__` method takes the `network_manager` as an argument and saves them as instance variables. It also creates empty `_filename`, `_filename_short`, and `_file_transfer_pending` instance variables for storing the filename, the file basename, and the file transfer pending status, respectively.
+> Its `__init__` method takes the `network_manager` as an argument and saves them as instance variables. It also creates an empty `_file_transfer_pending` boolean instance variable to indicate whether a transfer is in progress, as well as `_filename` and `_filename_short` instance variables for storing the filename and basename for any current transfer.
 
 ## Client.run
 
