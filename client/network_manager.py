@@ -11,16 +11,15 @@ logger = logging.getLogger(__name__)
 
 class NetworkManager:
     def __init__(self, host: str, port: int):
-        self.socket: socket.socket | None = None
         self.host: str = host
         self.port: int = port
+        self.socket: socket.socket | None = None
         self.connected: bool = False
-        self.username: str = ""
-        self.receive_thread: threading.Thread | None = None
         self.max_buff_size: int = 1024
-        self.event_handlers: dict[str, list[Callable]] = {
-            "unknown": [lambda data: logger.debug(f"Ignored unhandled event: {data}")]
-        }
+        self.receive_thread: threading.Thread | None = None
+
+        self.username: str = ""
+        self.event_handlers: dict[str, list[Callable]] = {}
 
     def connect(self):
         try:
@@ -89,6 +88,7 @@ class NetworkManager:
             raise ConnectionError("Not connected to server")
         try:
             data: dict[str, Any] = receive(self.socket, self.max_buff_size)
+            logger.debug(f"Decrypted data: {data}")
             return data
         except json.JSONDecodeError:
             logger.error("Received invalid JSON data")
@@ -115,9 +115,7 @@ class NetworkManager:
         self.event_handlers[event].append(handler)
 
     def clear_event_handlers(self) -> None:
-        self.event_handlers = {
-            "unknown": [lambda data: logger.debug(f"Ignored unhandled event: {data}")]
-        }
+        self.event_handlers = {}
 
     def _receive_loop(self) -> None:
         while self.connected:
@@ -125,8 +123,11 @@ class NetworkManager:
             if data:
                 event: str = data.get("type", "unknown")
                 handlers: list[Callable] = self.event_handlers.get(event, [])
-                for handler in handlers:
-                    handler(data)
+                if not handlers:
+                    logger.debug(f"Ignored unhandled event: {data}")
+                else:
+                    for handler in handlers:
+                        handler(data)
             else:
                 logger.warning(f"Empty message received from server.")
 
