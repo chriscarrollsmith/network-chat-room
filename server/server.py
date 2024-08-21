@@ -13,10 +13,10 @@ configure_logger()
 logger = logging.getLogger(__name__)
 
 
-# Handler class for managing client connections
-class Handler(socketserver.BaseRequestHandler):
+# RequestHandler class for managing client connections
+class RequestHandler(socketserver.BaseRequestHandler):
     # Thread-safe dictionary to store connected clients
-    clients: dict[str, "Handler"] = {}
+    clients: dict[str, "RequestHandler"] = {}
     clients_lock: threading.Lock = threading.Lock()
 
     # Load user data and chat history
@@ -78,9 +78,9 @@ class Handler(socketserver.BaseRequestHandler):
         if self.authed:
             self.authed = False
 
-            with Handler.clients_lock:
-                if self.username in Handler.clients:
-                    del Handler.clients[self.username]
+            with RequestHandler.clients_lock:
+                if self.username in RequestHandler.clients:
+                    del RequestHandler.clients[self.username]
                     logger.info(f"Removed {self.username} from connected clients")
 
             self._notify_peer_left()
@@ -114,8 +114,8 @@ class Handler(socketserver.BaseRequestHandler):
             login_result.update({"response": "ok"})
             send(self.request, login_result)
             self.authed = True
-            with Handler.clients_lock:
-                Handler.clients[self.username] = self
+            with RequestHandler.clients_lock:
+                RequestHandler.clients[self.username] = self
             self._notify_peer_joined()
         else:
             login_result.update(
@@ -168,10 +168,10 @@ class Handler(socketserver.BaseRequestHandler):
         """
         Notify other clients about the new user joining.
         """
-        with Handler.clients_lock:
-            for user in Handler.clients.keys():
+        with RequestHandler.clients_lock:
+            for user in RequestHandler.clients.keys():
                 send(
-                    Handler.clients[user].request,
+                    RequestHandler.clients[user].request,
                     {"type": "peer_joined", "peer": self.username},
                 )
 
@@ -212,8 +212,10 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data (unused in this method).
         """
-        with Handler.clients_lock:
-            users = [user for user in Handler.clients.keys() if user != self.username]
+        with RequestHandler.clients_lock:
+            users = [
+                user for user in RequestHandler.clients.keys() if user != self.username
+            ]
         send(self.request, {"type": "get_users", "data": users})
 
     def _handle_get_history(self, data: dict[str, str]) -> None:
@@ -251,10 +253,10 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing the private chat message and its recipient.
         """
-        with Handler.clients_lock:
-            if data["peer"] in Handler.clients:
+        with RequestHandler.clients_lock:
+            if data["peer"] in RequestHandler.clients:
                 send(
-                    Handler.clients[data["peer"]].request,
+                    RequestHandler.clients[data["peer"]].request,
                     {
                         "type": "private_message",
                         "peer": self.username,
@@ -272,11 +274,11 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing the broadcast chat message.
         """
-        with Handler.clients_lock:
-            for user in Handler.clients.keys():
+        with RequestHandler.clients_lock:
+            for user in RequestHandler.clients.keys():
                 if user != self.username:
                     send(
-                        Handler.clients[user].request,
+                        RequestHandler.clients[user].request,
                         {
                             "type": "broadcast_message",
                             "peer": self.username,
@@ -292,11 +294,11 @@ class Handler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing file transfer request information.
         """
-        with Handler.clients_lock:
-            if data["peer"] in Handler.clients:
-                Handler.clients[data["peer"]].file_peer = self.username
+        with RequestHandler.clients_lock:
+            if data["peer"] in RequestHandler.clients:
+                RequestHandler.clients[data["peer"]].file_peer = self.username
                 send(
-                    Handler.clients[data["peer"]].request,
+                    RequestHandler.clients[data["peer"]].request,
                     {
                         "type": "file_request",
                         "peer": self.username,
@@ -324,8 +326,8 @@ class Handler(socketserver.BaseRequestHandler):
         """
         if data["peer"] == self.file_peer:
             self.file_peer = ""
-            with Handler.clients_lock:
-                if data["peer"] in Handler.clients:
+            with RequestHandler.clients_lock:
+                if data["peer"] in RequestHandler.clients:
                     response = {
                         "type": "file_response",
                         "peer": self.username,
@@ -333,7 +335,7 @@ class Handler(socketserver.BaseRequestHandler):
                     }
                     if data["response"] == "accept":
                         response["ip"] = self.client_address[0]
-                    send(Handler.clients[data["peer"]].request, response)
+                    send(RequestHandler.clients[data["peer"]].request, response)
 
     def _handle_close(self, data: dict[str, str]) -> None:
         """
@@ -348,10 +350,10 @@ class Handler(socketserver.BaseRequestHandler):
         """
         Notify other clients about the user leaving.
         """
-        with Handler.clients_lock:
-            for user in Handler.clients.keys():
+        with RequestHandler.clients_lock:
+            for user in RequestHandler.clients.keys():
                 send(
-                    Handler.clients[user].request,
+                    RequestHandler.clients[user].request,
                     {"type": "peer_left", "peer": self.username},
                 )
 
@@ -361,7 +363,7 @@ if __name__ == "__main__":
     try:
         # Start the server
         app: socketserver.ThreadingTCPServer = socketserver.ThreadingTCPServer(
-            ("0.0.0.0", 8888), Handler
+            ("0.0.0.0", 8888), RequestHandler
         )
         logger.info("Server started on 0.0.0.0:8888")
         app.serve_forever()
