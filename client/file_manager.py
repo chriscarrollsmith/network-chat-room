@@ -26,8 +26,8 @@ def format_file_size(size: int | float, suffix: str = "B") -> str:
 class FileManager:
     def __init__(self, network_manager: NetworkManager):
         self.network_manager: NetworkManager = network_manager
+        self._filepath: str = ""
         self._filename: str = ""
-        self._filename_short: str = ""
         self._file_transfer_pending: bool = False
 
     def send_file_request(self, current_session: str) -> None:
@@ -35,8 +35,8 @@ class FileManager:
         if filename == "":
             return
 
-        self._filename = filename
-        self._filename_short = os.path.basename(filename)
+        self._filepath = filename
+        self._filename = os.path.basename(filename)
         size: int = os.path.getsize(filename)
         size_str: str = format_file_size(size)
         md5_checksum: str = get_file_md5(filename)
@@ -45,7 +45,7 @@ class FileManager:
             {
                 "command": "file_request",
                 "peer": current_session,
-                "filename": self._filename_short,
+                "filename": self._filename,
                 "size": size_str,
                 "md5": md5_checksum,
             }
@@ -60,7 +60,7 @@ class FileManager:
                 client.connect((data["ip"], 1031))
                 start_time: float = time.time()
 
-                with open(self._filename, "rb") as f:
+                with open(self._filepath, "rb") as f:
                     while True:
                         file_data = f.read(1024)
                         if not file_data:
@@ -95,6 +95,6 @@ class FileManager:
         return total_bytes, transfer_time
 
     def _reset_file_state(self) -> None:
+        self._filepath = ""
         self._filename = ""
-        self._filename_short = ""
         self._file_transfer_pending = False
