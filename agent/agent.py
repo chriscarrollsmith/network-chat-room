@@ -3,6 +3,9 @@ import random
 import time
 import threading
 import logging
+import tempfile
+import shutil
+import os
 from typing import Any, Literal, Callable
 from utils.encryption import send, receive
 from client.file_manager import get_file_md5, format_file_size
@@ -44,6 +47,8 @@ class Agent:
         self._filename: str = ""
         self._filename_short: str = ""
         self._file_transfer_pending: bool = False
+        self.temp_dir = tempfile.mkdtemp()
+        logger.debug(f"Created temporary directory: {self.temp_dir}")
 
     # --- Connection management ---
 
@@ -111,6 +116,10 @@ class Agent:
         self.socket = None
         self.receive_thread = None
 
+        # Clean up the temporary directory
+        shutil.rmtree(self.temp_dir)
+        logger.debug(f"Removed temporary directory: {self.temp_dir}")
+
         self.validate_connection_state(should_be_connected=False)
 
     # --- State management ---
@@ -141,13 +150,13 @@ class Agent:
         self.send({"command": type, "username": username, "password": password})
 
     def send_file_request(self) -> None:
-        filename: str = "testfile.txt"
+        filepath: str = os.path.join(self.temp_dir, "test.txt")
 
-        self._filename = filename
-        self._filename_short = os.path.basename(filename)
-        size: int = os.path.getsize(filename)
+        self._filename = filepath
+        self._filename_short = os.path.basename(filepath)
+        size: int = os.path.getsize(filepath)
         size_str: str = format_file_size(size)
-        md5_checksum: str = get_file_md5(filename)
+        md5_checksum: str = get_file_md5(filepath)
 
         self.send(
             {
@@ -209,13 +218,14 @@ class Agent:
 
     def receive_file_data(self, filename: str) -> tuple[int, float]:
         total_bytes: int = 0
+        file_path = os.path.join(self.temp_dir, filename)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
             server.bind(("0.0.0.0", 1031))
             server.listen(1)
             client_socket, _ = server.accept()
             start_time: float = time.time()
 
-            with open(filename, "wb") as f:
+            with open(file_path, "wb") as f:
                 while True:
                     file_data = client_socket.recv(1024)
                     if not file_data:
@@ -368,7 +378,8 @@ if __name__ == "__main__":
 
         app.send({"command": "message", "peer": "", "message": "Hello, world!"})
 
-        time.sleep(60)
+        while True:
+            time.sleep(1)
 
     finally:
         app.close()
