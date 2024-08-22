@@ -2,9 +2,12 @@ import os
 import time
 import socket
 import hashlib
+import logging
 import tkinter.filedialog
 import tkinter.messagebox
 from client.network_manager import NetworkManager
+
+logger = logging.getLogger(__name__)
 
 
 def get_file_md5(filepath: str) -> str:
@@ -32,6 +35,7 @@ class FileManager:
 
     def send_file_request(self, current_session: str) -> None:
         filename: str = tkinter.filedialog.askopenfilename()
+        logger.debug(f"Selected file: {filename}")
         if filename == "":
             return
 
@@ -41,6 +45,7 @@ class FileManager:
         size_str: str = format_file_size(size)
         md5_checksum: str = get_file_md5(filename)
 
+        logger.debug(f"Sending file request to {current_session}")
         self.network_manager.send(
             {
                 "command": "file_request",
@@ -50,12 +55,15 @@ class FileManager:
                 "md5": md5_checksum,
             }
         )
+        logger.debug("File request sent")
 
         self._file_transfer_pending = True
 
     def send_file_data(self, data: dict) -> tuple[int, float]:
         try:
             total_bytes: int = 0
+            # Establish a new connection to the peer and send the file data
+            logger.debug(f"Opening file transfer socket to {data['ip']}")
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
                 client.connect((data["ip"], 1031))
                 start_time: float = time.time()
@@ -70,11 +78,12 @@ class FileManager:
 
             end_time: float = time.time()
             transfer_time: float = end_time - start_time
+            logger.debug(f"File transfer complete: {total_bytes} bytes sent")
             return total_bytes, transfer_time
         finally:
             self._reset_file_state()
 
-    def receive_file_data(self, filename: str) -> tuple[int, float]:
+    def receive_file_data(self, destination_path: str) -> tuple[int, float]:
         total_bytes: int = 0
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
             server.bind(("0.0.0.0", 1031))
@@ -82,7 +91,7 @@ class FileManager:
             client_socket, _ = server.accept()
             start_time: float = time.time()
 
-            with open(filename, "wb") as f:
+            with open(destination_path, "wb") as f:
                 while True:
                     file_data = client_socket.recv(1024)
                     if not file_data:

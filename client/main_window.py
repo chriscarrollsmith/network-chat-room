@@ -6,6 +6,7 @@ import time
 import tkinter as tk
 from typing import Callable
 from tkinter import messagebox
+from tkinter import filedialog
 from client.network_manager import NetworkManager
 from client.file_manager import FileManager
 
@@ -178,13 +179,25 @@ class MainWindow:
         self.history.see(tk.END)
         self.history["state"] = "disabled"
 
-    def show_file_receive_dialog(self, peer: str, filename: str, size: int) -> bool:
-        messagebox.showinfo(
-            "File Received", f"{peer} has sent you a file: {filename} ({size} bytes)"
+    def show_file_receive_dialog(
+        self, peer: str, filename: str, size: int
+    ) -> tuple[bool, str]:
+        accept = messagebox.askyesno(
+            "File Request",
+            f"{peer} wants to send you a file: {filename} ({size} bytes). Accept?",
         )
-        return messagebox.askyesno(
-            "Accept File", f"Do you want to accept the file from {peer}?"
-        )
+
+        if accept:
+            destination_path = filedialog.asksaveasfilename(
+                defaultextension="",
+                initialfile=filename,
+                title=f"Save file from {peer}",
+            )
+            if not destination_path:
+                return False, ""
+            return True, destination_path
+        else:
+            return False, ""
 
     # --- Outgoing server command triggers ---
 
@@ -245,7 +258,7 @@ class MainWindow:
 
     def send_file(self) -> None:
         try:
-            self.file_manager.send_file_request(self.current_chat.get())
+            self.file_manager.send_file_request(self.current_session)
         except Exception as e:
             messagebox.showerror("Error", f"Error sending file: {str(e)}")
 
@@ -287,13 +300,17 @@ class MainWindow:
             self.update_user_list({sender: True})
 
     def handle_file_request(self, data: dict) -> None:
-        if self.show_file_receive_dialog(data["peer"], data["filename"], data["size"]):
+        file_receive_result: tuple[bool, str] = self.show_file_receive_dialog(
+            data["peer"], data["filename"], data["size"]
+        )
+        accept_file, destination_path = file_receive_result
+        if accept_file:
             self.network_manager.send(
                 {"command": "file_response", "peer": data["peer"], "response": "accept"}
             )
             try:
                 total_bytes, transfer_time = self.file_manager.receive_file_data(
-                    data["filename"]
+                    destination_path,
                 )
                 messagebox.showinfo(
                     "Info",
@@ -316,8 +333,11 @@ class MainWindow:
                 )
             except Exception as e:
                 messagebox.showerror("Error", f"Error sending file: {str(e)}")
-        else:
+        elif data["response"] == "deny":
             messagebox.showinfo("Info", "File transfer denied by recipient")
+            self.file_manager._reset_file_state()
+        elif data["response"] == "error":
+            messagebox.showerror("Error", f"File transfer error: {data['reason']}")
             self.file_manager._reset_file_state()
 
     def handle_peer_joined(self, data: dict) -> None:

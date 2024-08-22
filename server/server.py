@@ -42,6 +42,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
         try:
             while True:
                 try:
+                    # self.request is the TCP socket connected to the client
                     data: dict = receive(self.request, self.max_buff_size)
                     if data:
                         logger.debug(
@@ -312,7 +313,8 @@ class RequestHandler(socketserver.BaseRequestHandler):
                 send(
                     self.request,
                     {
-                        "type": "file_request_error",
+                        "type": "file_response",
+                        "response": "error",
                         "reason": "Peer not found or not connected",
                     },
                 )
