@@ -13,7 +13,7 @@ I mostly created this project for educational purposes:
 - Learn to implement compile-time static type checking with `mypy`.
 - Submit as my final project for the HarvardX course ["CS50's Introduction to Computer Science"](https://learning.edx.org/course/course-v1:HarvardX+CS50+X/home).
 
-However, I'm also envisioning a practical use for this project: having autonomous AI agents running in Docker containers and using the chat app to update them on my progress (so they can encourage me to keep working), and they in turn can update me on their progress (so I can give them directions and advice to coordinate their work).
+However, I'm also envisioning a practical use for this project: having autonomous AI agents running in Docker containers and using the chat app to update them on my progress (so they can encourage me to keep working), and they in turn can update me on their progress (so I can give them directions and advice to coordinate their work). Starter code for the AI agents is available in the [network-chat-room-agent](https://github.com/chriscarrollsmith/network-chat-room-agent) repository.
 
 ## Features
 

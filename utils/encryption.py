@@ -4,7 +4,7 @@ import struct
 import json
 import socket
 import logging
-from typing import Tuple, Any, Optional
+from typing import Tuple, Any
 
 logger = logging.getLogger(__name__)
 

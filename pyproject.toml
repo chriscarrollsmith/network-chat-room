@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "socket-chat-room"
+name = "network-chat-room"
 version = "0.1.0"
 description = ""
 authors = ["Christopher Carroll Smith <chriscarrollsmith@gmail.com>"]

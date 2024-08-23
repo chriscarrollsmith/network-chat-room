@@ -7,7 +7,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install poetry
-RUN pip install poetry
+RUN pipx install poetry
 
 # Copy poetry files
 COPY pyproject.toml poetry.lock ./
@@ -16,7 +16,6 @@ COPY pyproject.toml poetry.lock ./
 COPY client /app/client
 COPY utils /app/utils
 COPY server /app/server
-COPY agent /app/agent
 
 # Install dependencies
 RUN poetry config virtualenvs.create false \

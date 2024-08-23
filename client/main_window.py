@@ -4,7 +4,7 @@
 
 import time
 import tkinter as tk
-from typing import Callable
+from typing import Callable, Optional
 from tkinter import messagebox
 from tkinter import filedialog
 from client.network_manager import NetworkManager
@@ -105,7 +105,7 @@ class MainWindow:
 
     # --- Window setup and teardown ---
 
-    def register_event_handlers(self):
+    def register_event_handlers(self) -> None:
         # TODO: Create an event handler class to enforce the event system's API?
         # TODO: Create pydantic models for event requests and responses
         event_handlers: dict[str, Callable[[dict], None]] = {
@@ -134,7 +134,7 @@ class MainWindow:
 
     # --- UI control ---
 
-    def update_user_list(self, users: list[dict[str, bool]]) -> None:
+    def update_user_list(self, users: dict[str, bool]) -> None:
         selected = self.user_list.curselection()
         self.user_list.delete(0, tk.END)
         for user, has_unread in users.items():
@@ -227,7 +227,7 @@ class MainWindow:
                 # Enable send file button for private chats
                 self.btn_file.configure(state="normal")
 
-    def send_message(self, event: tk.Event = None) -> None:
+    def send_message(self, event: Optional[tk.Event] = None) -> None:
         try:
             message = self.msg.get()
             if message:
