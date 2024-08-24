@@ -1,6 +1,9 @@
 import pickle
 import time
+import logging
 from threading import Lock
+
+logger = logging.getLogger(__name__)
 
 
 class ChatHistory:
@@ -31,13 +34,10 @@ class ChatHistory:
             receiver: The username of the message receiver, or an empty string for broadcast messages.
             msg: The message content.
         """
-        with self.lock:
-            key = (
-                ("", "")
-                if receiver == ""
-                else self.get_chat_identifier(sender, receiver)
-            )
+        logger.debug(f"Appending message to history: {sender} -> {receiver}: {msg}")
+        key = ("", "") if receiver == "" else self.get_chat_identifier(sender, receiver)
 
+        with self.lock:
             if key not in self.history:
                 self.history[key] = []
 
@@ -45,7 +45,8 @@ class ChatHistory:
                 (sender, time.strftime("%m/%d %H:%M", time.localtime()), msg)
             )
 
-            self.save_history()
+        self.save_history()
+        logger.debug(f"Successfully appended message to history and released lock.")
 
     def get_history(self, sender: str, receiver: str) -> list[tuple[str, str, str]]:
         """
@@ -82,9 +83,8 @@ class ChatHistory:
         Returns:
             A dictionary containing chat history, or an empty dictionary if the file doesn't exist.
         """
-        with self.lock:
-            try:
-                with open("history.dat", "rb") as f:
-                    return pickle.load(f)
-            except (FileNotFoundError, pickle.UnpicklingError):
-                return {}
+        try:
+            with open("history.dat", "rb") as f:
+                return pickle.load(f)
+        except (FileNotFoundError, pickle.UnpicklingError):
+            return {}
