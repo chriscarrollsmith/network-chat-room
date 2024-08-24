@@ -39,37 +39,29 @@ class RequestHandler(socketserver.BaseRequestHandler):
         """
         Handle client requests and manage the client connection.
         """
-        try:
-            while True:
-                try:
-                    # self.request is the TCP socket connected to the client
-                    data: dict = receive(self.request, self.max_buff_size)
-                    if data:
-                        logger.debug(
-                            f"Received data from {self.client_address}: {data}"
-                        )
+        while self.request:
+            try:
+                # self.request is the TCP socket connected to the client
+                data: dict = receive(self.request, self.max_buff_size)
+                if data:
+                    logger.debug(f"Received data from {self.client_address}: {data}")
 
-                        if not self.authed:
-                            self._handle_authentication(data)
-                        else:
-                            self._handle_authenticated_commands(data)
+                    if not self.authed:
+                        self._handle_authentication(data)
                     else:
-                        logger.error(
-                            f"Empty message received from {self.client_address}"
-                        )
-                except ConnectionResetError:
-                    logger.warning(f"Connection reset by {self.client_address}")
-                    break
-                except ConnectionError as e:
-                    logger.warning(f"Connection error with {self.client_address}: {e}")
-                    break
-                except Exception as e:
-                    logger.error(
-                        f"Error handling request from {self.client_address}: {e}"
-                    )
-                    break
-        finally:
-            self.finish()
+                        self._handle_authenticated_commands(data)
+                else:
+                    logger.error(f"Empty message received from {self.client_address}")
+            except ConnectionResetError:
+                logger.warning(f"Connection reset by {self.client_address}")
+                break
+            except ConnectionError as e:
+                logger.warning(f"Connection error with {self.client_address}: {e}")
+                break
+            except Exception as e:
+                logger.error(f"Error handling request from {self.client_address}: {e}")
+                break
+        self.finish()
 
     def finish(self) -> None:
         """
@@ -276,6 +268,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
             data (dict): The received data containing the broadcast chat message.
         """
         with RequestHandler.clients_lock:
+            logger.debug(f"You're inside the clients lock")
             for user in RequestHandler.clients.keys():
                 if user != self.username:
                     send(
@@ -286,6 +279,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
                             "message": data["message"],
                         },
                     )
+        logger.debug("You're outside the clients lock")
         self.chat_history.append_to_history(self.username, "", data["message"])
 
     def _handle_file_request(self, data: dict[str, str]) -> None:

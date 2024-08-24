@@ -1,6 +1,7 @@
 # TODO: Decide whether we want separate rooms for different users or just one
 # global chat room with tags for private messages (current implementation),
-# in which case "unread" indicator and "read" command are unnecessary
+# in which case "unread" indicator is unnecessary
+# TODO: Remove underline after deselecting user from list
 
 import time
 import tkinter as tk
@@ -211,7 +212,7 @@ class MainWindow:
             value = self.user_list.get(index)
             selected_user = value.split(" (")[0]
             if selected_user == self.current_session:
-                self.user_list.selection_clear(index)
+                self.user_list.selection_clear(0, tk.END)
                 self.current_session = ""
                 self.current_chat.set("Global Chat Room")
                 # Disable send file button for global chat
@@ -219,13 +220,15 @@ class MainWindow:
             else:
                 self.current_chat.set(f"Chatting with: {selected_user}")
                 self.current_session = selected_user
-                # Clear unread indicator for the selected user
-                self.network_manager.send(
-                    {"command": "read", "peer": self.current_session}
-                )
                 self.update_user_list({self.current_session: False})
                 # Enable send file button for private chats
                 self.btn_file.configure(state="normal")
+        else:
+            # No selection, switch to global chat
+            self.current_session = ""
+            self.current_chat.set("Global Chat Room")
+            # Disable send file button for global chat
+            self.btn_file.configure(state="disabled")
 
     def send_message(self, event: Optional[tk.Event] = None) -> None:
         try:

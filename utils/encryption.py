@@ -1,3 +1,5 @@
+# TODO: Implement better encryption and secure key exchange
+
 import base64
 import os
 import struct
