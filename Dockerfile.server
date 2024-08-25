@@ -19,6 +19,7 @@ COPY pyproject.toml poetry.lock ./
 COPY client /app/client
 COPY utils /app/utils
 COPY server /app/server
+COPY .env /app/.env
 
 # Install dependencies
 RUN poetry config virtualenvs.create false \
