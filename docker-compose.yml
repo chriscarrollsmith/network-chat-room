@@ -14,8 +14,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.client
-    environment:
-      - DISPLAY=<your_host_ip>:0.0
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
     depends_on:
