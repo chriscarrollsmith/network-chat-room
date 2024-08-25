@@ -1,15 +1,20 @@
 # Import necessary modules
+import os
 import socketserver
+import threading
 import logging
 from typing import Callable
+from dotenv import load_dotenv
 from utils.encryption import send, receive
 from utils.logger import configure_logger
 from server.user_manager import UserManager
 from server.chat_history import ChatHistory
-import threading
+
+load_dotenv(override=True)
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
 # Set up logger
-configure_logger()
+configure_logger(LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 
@@ -355,9 +360,6 @@ class RequestHandler(socketserver.BaseRequestHandler):
 
 
 if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv
-
     try:
         load_dotenv(override=True)
         port: int | str = os.environ("SERVER_PORT", 8888)

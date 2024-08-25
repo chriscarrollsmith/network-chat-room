@@ -1,11 +1,6 @@
-import os
 import logging
 import queue
-from dotenv import load_dotenv
 from logging.handlers import QueueHandler, QueueListener
-
-load_dotenv(override=True)
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
 
 def configure_logger(level: int = logging.INFO) -> None:
