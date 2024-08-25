@@ -131,4 +131,4 @@ For production use, consider implementing:
 - Hashing stored user data with a secure hashing algorithm
 - Database for user and chat history storage
 - Additional features and UI improvements
-- Compile a distributable executable for the client with `pyinstaller` or `cpython`
+- Compile a distributable executable for the client with `pyinstaller` or, alternatively, drop the tkinter GUI and build a browser-based client interface with JavaScript
