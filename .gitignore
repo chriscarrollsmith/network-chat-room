@@ -2,3 +2,6 @@ __pycache__
 .mypy_cache/
 users.dat
 history.dat
+.env
+.venv
+venv

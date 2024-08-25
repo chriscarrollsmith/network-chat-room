@@ -49,8 +49,12 @@ class Client:
 
 
 if __name__ == "__main__":
-    server_ip = "127.0.0.1"
-    server_port = 8888
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv(override=True)
+    server_ip: str = os.environ.get("SERVER_IP", "127.0.0.1")
+    server_port: int | str = os.environ.get("SERVER_PORT", 8888)
 
     app = Client(server_ip, server_port)
     app.run()

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8888:8888"
+    networks:
+      - network_chat_room
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    environment:
+      - DISPLAY=<your_host_ip>:0.0
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    depends_on:
+      - server
+    networks:
+      - network_chat_room
+
+networks:
+  network_chat_room:
+    driver: bridge

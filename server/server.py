@@ -355,13 +355,18 @@ class RequestHandler(socketserver.BaseRequestHandler):
 
 
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
 
     try:
+        load_dotenv(override=True)
+        port: int | str = os.environ("SERVER_PORT", 8888)
+
         # Start the server
         app: socketserver.ThreadingTCPServer = socketserver.ThreadingTCPServer(
-            ("0.0.0.0", 8888), RequestHandler
+            ("0.0.0.0", port), RequestHandler
         )
-        logger.info("Server started on 0.0.0.0:8888")
+        logger.info(f"Server started on 0.0.0.0:{port}")
         app.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server shutting down...")
