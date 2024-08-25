@@ -3,12 +3,24 @@ import traceback
 import pickle
 import threading
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+load_dotenv()
+
+# Ensure that the data directory exists
+STORAGE_DIR: Path = Path.cwd() / os.getenv("STORAGE_DIR", ".ncr-data")
+STORAGE_DIR.mkdir(exist_ok=True)
 
 
 class UserManager:
     def __init__(self) -> None:
+        self.users_file: Path = STORAGE_DIR / "users.dat"
+        self.logger = logging.getLogger(__name__)
+
+        # Log absolute path of users file
+        self.logger.debug(f"Users file path: {self.users_file.absolute()}")
+
         self.users: dict[str, str] = self.load_users()
         self.lock: threading.Lock = threading.Lock()
 
@@ -20,11 +32,13 @@ class UserManager:
             A dictionary containing user data, or an empty dictionary if the file doesn't exist.
         """
         try:
-            with open("users.dat", "rb") as f:
+            with open(self.users_file, "rb") as f:
                 users = pickle.load(f)
             return users
         except (FileNotFoundError, pickle.UnpicklingError) as e:
-            logger.warning(f"Failed to load users: {str(e)}")
+            self.logger.warning(
+                f"Failed to load {self.users_file.name}; file will be created"
+            )
             return {}
 
     def register(self, username: str, password: str) -> bool:
@@ -38,7 +52,7 @@ class UserManager:
         Returns:
             True if registration is successful, False if the username already exists.
         """
-        logger.debug(f"Attempting to register user: {username}")
+        self.logger.debug(f"Attempting to register user: {username}")
         try:
             if not self.lock.acquire(timeout=5):
                 return False
@@ -46,18 +60,18 @@ class UserManager:
                 if username not in self.users:
                     self.users[username] = password
                     self.save_users()
-                    logger.info(f"User {username} registered successfully")
+                    self.logger.info(f"User {username} registered successfully")
                     return True
-                logger.warning(
+                self.logger.warning(
                     f"Registration failed: Username {username} already exists"
                 )
                 return False
             finally:
                 self.lock.release()
-                logger.debug("Lock released")
+                self.logger.debug("Lock released")
         except Exception as e:
-            logger.error(f"Unexpected error in register method: {str(e)}")
-            logger.error(traceback.format_exc())
+            self.logger.error(f"Unexpected error in register method: {str(e)}")
+            self.logger.error(traceback.format_exc())
             return False
 
     def validate(self, username: str, password: str) -> bool:
@@ -73,18 +87,17 @@ class UserManager:
         """
         with self.lock:
             is_valid = username in self.users and self.users[username] == password
-            logger.debug(
+            self.logger.debug(
                 f"Validating user {username}: {'Success' if is_valid else 'Failed'}"
             )
             return is_valid
 
     def save_users(self) -> None:
-        logger.debug("Saving users to file")
+        self.logger.debug("Saving users to file")
         try:
-            file_path = "users.dat"
-            with open(file_path, "wb") as f:
+            with open(self.users_file, "wb") as f:
                 pickle.dump(self.users, f)
         except Exception as e:
-            logger.error(f"Failed to save users: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(traceback.format_exc())
+            self.logger.error(f"Failed to save users: {str(e)}")
+            self.logger.error(f"Exception type: {type(e).__name__}")
+            self.logger.error(traceback.format_exc())

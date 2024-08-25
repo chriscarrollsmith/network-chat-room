@@ -1,15 +1,29 @@
+import os
 import pickle
 import time
 import logging
+from dotenv import load_dotenv
+from pathlib import Path
 from threading import Lock
 
-logger = logging.getLogger(__name__)
+load_dotenv()
+
+# Ensure that the data directory exists
+STORAGE_DIR: Path = Path.cwd() / os.getenv("STORAGE_DIR", ".ncr-data")
+STORAGE_DIR.mkdir(exist_ok=True)
 
 
 class ChatHistory:
     def __init__(self) -> None:
-        self.history: dict[tuple[str, str], list[tuple[str, str, str]]] = {}
         self.lock = Lock()
+        self.history: dict[tuple[str, str], list[tuple[str, str, str]]] = {}
+        self.history_file: Path = STORAGE_DIR / "history.dat"
+
+        self.logger = logging.getLogger(__name__)
+
+        # Log absolute path of history file
+        self.logger.debug(f"History file path: {self.history_file.absolute()}")
+
         self.load_history()
 
     def get_chat_identifier(self, u1: str, u2: str) -> tuple[str, str]:
@@ -34,7 +48,9 @@ class ChatHistory:
             receiver: The username of the message receiver, or an empty string for broadcast messages.
             msg: The message content.
         """
-        logger.debug(f"Appending message to history: {sender} -> {receiver}: {msg}")
+        self.logger.debug(
+            f"Appending message to history: {sender} -> {receiver}: {msg}"
+        )
         key = ("", "") if receiver == "" else self.get_chat_identifier(sender, receiver)
 
         with self.lock:
@@ -46,7 +62,9 @@ class ChatHistory:
             )
 
         self.save_history()
-        logger.debug(f"Successfully appended message to history and released lock.")
+        self.logger.debug(
+            f"Successfully appended message to history and released lock."
+        )
 
     def get_history(self, sender: str, receiver: str) -> list[tuple[str, str, str]]:
         """
@@ -73,7 +91,8 @@ class ChatHistory:
         Save chat history to a file.
         """
         with self.lock:
-            with open("history.dat", "wb") as f:
+            # Join the storage directory with the filename using Path
+            with open(self.history_file, "wb") as f:
                 pickle.dump(self.history, f)
 
     def load_history(self) -> dict[tuple[str, str], list[tuple[str, str, str]]]:
@@ -84,7 +103,10 @@ class ChatHistory:
             A dictionary containing chat history, or an empty dictionary if the file doesn't exist.
         """
         try:
-            with open("history.dat", "rb") as f:
+            with open(self.history_file, "rb") as f:
                 return pickle.load(f)
         except (FileNotFoundError, pickle.UnpicklingError):
+            self.logger.warning(
+                f"Failed to load {self.history_file.name}; file will be created"
+            )
             return {}

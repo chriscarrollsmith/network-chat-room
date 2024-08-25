@@ -1,5 +1,7 @@
 __pycache__
 .mypy_cache/
+data/
+.ncr-data/
 users.dat
 history.dat
 .env
