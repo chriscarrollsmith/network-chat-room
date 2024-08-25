@@ -16,7 +16,7 @@ def configure_logger(level: int = logging.INFO) -> None:
     console_handler.setFormatter(formatter)
 
     # Create a queue for sharing log messages across threads
-    log_queue = queue.Queue(-1)
+    log_queue: queue.Queue = queue.Queue(-1)
 
     # Set up the queue handler
     queue_handler = QueueHandler(log_queue)

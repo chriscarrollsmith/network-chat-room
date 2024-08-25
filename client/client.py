@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     load_dotenv(override=True)
     server_ip: str = os.environ.get("SERVER_IP", "127.0.0.1")
-    server_port: int | str = os.environ.get("SERVER_PORT", 8888)
+    server_port: int = int(os.environ.get("SERVER_PORT", 8888)) or 8888
 
     app = Client(server_ip, server_port)
     app.run()

@@ -362,7 +362,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
 if __name__ == "__main__":
     try:
         load_dotenv(override=True)
-        port: int | str = os.environ("SERVER_PORT", 8888)
+        port: int = int(os.environ.get("SERVER_PORT", 8888)) or 8888
 
         # Start the server
         app: socketserver.ThreadingTCPServer = socketserver.ThreadingTCPServer(
