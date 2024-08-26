@@ -30,28 +30,38 @@ You can find a starter template for building chat room-connected AI agents in th
 
 ## Running locally
 
-To run the application locally, you will need[git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git), [Python 3.12](https://www.python.org/downloads/release/python-3120/) and the `poetry` package manager installed. You can install `poetry` by following the instructions at [python-poetry.org](https://python-poetry.org/docs/#installing-with-the-official-installer).
+To run the application locally, you will need [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git), [Python 3.12](https://www.python.org/downloads/release/python-3120/) and the `poetry` package manager installed. You can install `poetry` by following the instructions at [python-poetry.org](https://python-poetry.org/docs/#installing-with-the-official-installer).
 
 Once you have Python and `poetry` installed, you must clone the repo and install the package:
 
 1. Clone the repo:
 ```bash
-git clone https://github.com/chriscarrollsmith/network-chat-room-agent.git
+git clone https://github.com/chriscarrollsmith/network-chat-room.git
 ```
 
-2. Install the package:
+2. Navigate into the folder:
+```bash
+cd network-chat-room
+```
+
+3. Install the package:
 ```bash
 poetry install
 ```
 
+4. Copy the .example.env file to .env:
+```bash
+cp .example.env .env
+```
+
 Then you can run the server and client:
 
-3. Start the server:
+4. Start the server:
 ```bash
 poetry run python -m server.server
 ```
 
-4. Launch the client:
+5. Launch the client:
 ```bash
 poetry run python client.client
 ```
