@@ -30,7 +30,7 @@ You can find a starter template for building chat room-connected AI agents in th
 
 ## Running locally
 
-To run the application locally, you will need [Python 3.12](https://www.python.org/downloads/release/python-3120/) and the `poetry` package manager installed. You can install `poetry` by following the instructions at [python-poetry.org](https://python-poetry.org/docs/#installing-with-the-official-installer).
+To run the application locally, you will need[git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git), [Python 3.12](https://www.python.org/downloads/release/python-3120/) and the `poetry` package manager installed. You can install `poetry` by following the instructions at [python-poetry.org](https://python-poetry.org/docs/#installing-with-the-official-installer).
 
 Once you have Python and `poetry` installed, you must clone the repo and install the package:
 
