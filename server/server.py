@@ -308,7 +308,6 @@ class RequestHandler(socketserver.BaseRequestHandler):
                     },
                 )
             else:
-                # TODO: Use a different key (e.g., "status") for success/failure, not a separate error event type?
                 send(
                     self.request,
                     {
