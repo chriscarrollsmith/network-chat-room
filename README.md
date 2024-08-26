@@ -63,7 +63,7 @@ poetry run python -m server.server
 
 5. Launch the client:
 ```bash
-poetry run python client.client
+poetry run python -m client.client
 ```
 
 ## Usage
