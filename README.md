@@ -92,9 +92,10 @@ So before you get started, you should find and install the Docker Desktop applic
 
 Once you have Docker Desktop installed, you can either clone the repo and deploy with docker-compose, or skip the clone and deploy directly from the GitHub repo.
 
-1. Clone the repo (optional):
+1. Clone the repo and navigate into the folder (optional):
 ```bash
-git clone https://github.com/chriscarrollsmith/network-chat-room-agent.git
+git clone https://github.com/chriscarrollsmith/network-chat-room.git
+cd network-chat-room
 ```
 
 2. Build and run with docker-compose:
