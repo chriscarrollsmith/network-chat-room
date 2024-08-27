@@ -12,19 +12,19 @@ load_dotenv()
 STORAGE_DIR: Path = Path.cwd() / os.getenv("STORAGE_DIR", ".ncr-data")
 STORAGE_DIR.mkdir(exist_ok=True)
 
+logger = logging.getLogger(__name__)
+
 
 class ChatHistory:
     def __init__(self) -> None:
         self.lock = Lock()
-        self.history: dict[tuple[str, str], list[tuple[str, str, str]]] = {}
-        self.history_file: Path = STORAGE_DIR / "history.dat"
-
-        self.logger = logging.getLogger(__name__)
+        self.history_filepath: Path = STORAGE_DIR / "history.dat"
+        self.history: dict[tuple[str, str], list[tuple[str, str, str]]] = (
+            self.load_history()
+        )
 
         # Log absolute path of history file
-        self.logger.debug(f"History file path: {self.history_file.absolute()}")
-
-        self.load_history()
+        logger.debug(f"History file path: {self.history_filepath.absolute()}")
 
     def get_chat_identifier(self, u1: str, u2: str) -> tuple[str, str]:
         """
@@ -48,9 +48,7 @@ class ChatHistory:
             receiver: The username of the message receiver, or an empty string for broadcast messages.
             msg: The message content.
         """
-        self.logger.debug(
-            f"Appending message to history: {sender} -> {receiver}: {msg}"
-        )
+        logger.debug(f"Appending message to history: {sender} -> {receiver}: {msg}")
         key = ("", "") if receiver == "" else self.get_chat_identifier(sender, receiver)
 
         with self.lock:
@@ -62,9 +60,7 @@ class ChatHistory:
             )
 
         self.save_history()
-        self.logger.debug(
-            f"Successfully appended message to history and released lock."
-        )
+        logger.debug(f"Successfully appended message to history and released lock.")
 
     def get_history(self, sender: str, receiver: str) -> list[tuple[str, str, str]]:
         """
@@ -92,9 +88,10 @@ class ChatHistory:
         """
         with self.lock:
             # Join the storage directory with the filename using Path
-            with open(self.history_file, "wb") as f:
+            with open(self.history_filepath, "wb") as f:
                 pickle.dump(self.history, f)
 
+    # TODO: Abstract away the load-from-file logic that's repeated in UserManager and ChatHistory
     def load_history(self) -> dict[tuple[str, str], list[tuple[str, str, str]]]:
         """
         Load chat history from a file.
@@ -103,10 +100,10 @@ class ChatHistory:
             A dictionary containing chat history, or an empty dictionary if the file doesn't exist.
         """
         try:
-            with open(self.history_file, "rb") as f:
+            with open(self.history_filepath, "rb") as f:
                 return pickle.load(f)
         except (FileNotFoundError, pickle.UnpicklingError):
-            self.logger.warning(
-                f"Failed to load {self.history_file.name}; file will be created"
+            logger.warning(
+                f"Failed to load {self.history_filepath.name}; file will be created"
             )
             return {}

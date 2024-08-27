@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 class FileManager:
     def __init__(self, network_manager: NetworkManager):
         self.network_manager: NetworkManager = network_manager
+
+        self._file_transfer_pending: bool = False
         self._filepath: str = ""
         self._filename: str = ""
-        self._file_transfer_pending: bool = False
 
     def send_file_request(self, current_session: str) -> None:
         filename: str = tkinter.filedialog.askopenfilename()

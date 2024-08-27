@@ -26,41 +26,41 @@ While the class and its variables will be shared across all threads, instances a
 
 > ### UserManager initialization
 >
-> The `UserManager` class is responsible for server-side management of user records. It has methods for registering and validating users and saving and loading user records to and from a `users.dat` file.
+> The `UserManager` class is responsible for server-side management of user records. It has methods for registering and validating users and saving and loading user records to and from a `users.dat` file. When the class is imported, environment variables are loaded to get the location of the `STORAGE_DIR` where user records will be stored, and the directory is created if it doesn't exist already.
 >
-> The `__init__` method of `UserManager` creates a `threading.lock` for thread safety. It also creates a `users` instance variable for storing the `dict[str, str]` mapping of usernames to passwords, and calls the `load_users` method to load this `users` dictionary from the `users.dat` file. 
+> The `__init__` method of `UserManager` creates a `threading.lock` for thread safety in performing file operations. Then it constructs the file path of the `users.dat` user data file in the storage directory. A `users` instance variable for storing the `dict[str, str]` mapping of usernames to passwords is initialized with a value returned from the `load_users` method. 
 >
-> `load_users` opens the `users.dat` file in binary mode and loads the `users` dictionary from the file using `pickle.load` for deserialization. If the file does not exist, it creates an empty dictionary.
+> `load_users` opens the `users.dat` file in binary mode and loads the `users` dictionary from the file using `pickle.load` for deserialization. If deserialization fails or the file does not exist, it logs a warning and returns an empty dictionary.
 >
 > ### ChatHistory initialization
 >
-> The `ChatHistory` class is responsible for server-side management of chat logs. It has methods for saving and loading chat logs to and from a `history.dat` file.
+> The `ChatHistory` class is responsible for server-side management of chat logs. It has methods for saving and loading chat logs to and from a `history.dat` file. When the class is imported, environment variables are loaded to get the location of the `STORAGE_DIR` where chat logs will be stored, and the directory is created if it doesn't exist already.
 >
-> Its `__init__` method creates a `threading.lock` for thread safety. It also creates a `history` instance variable for storing the `dict[tuple[str, str], list[tuple[str, str, str]]]` mapping of chat identifiers (username pairs) to chat logs (a list of tuples, each containing a sender, a timestamp, and a message). It calls the `load_history` method to load this `history` dictionary from the `history.dat` file (using the lock as a context manager out of an overly conscientious concern for thread safety, even though this method is only called once upon initialization of the class).
+> Its `__init__` method creates a `threading.lock` for thread safety and constructs a `history_filepath` by adding `history.dat` to the storage dir. Then it initializes a `history` instance variable for storing the `dict[tuple[str, str], list[tuple[str, str, str]]]` mapping of chat identifiers (username pairs) to chat logs (a list of tuples, each containing a sender, a timestamp, and a message) with a value returned from the `load_history` method.
 >
-> `load_history` opens the `history.dat` file in binary mode and loads the `history` dictionary using `pickle.load`. If the file does not exist, it creates an empty dictionary.
+> `load_history` opens the `history.dat` file in binary mode and loads and returns the `history` dictionary using `pickle.load`. If deserialization fails or the file does not exist, it logs a warning and returns an empty dictionary.
 
 ## Client initialization
 
-When we start the client with `python -m client.app`, it creates an instance of the `Client` class at 127.0.0.1:8888.
+When we start the client with `python -m client.client`, it loads environment variables, gets the server IP and server port variables, and creates an instance of the `Client` class, passing the IP and port values to the constructor.
 
 The `__init__` method of the `Client` class creates empty `login_window` and `main_window` instance variables for storing the `Optional[LoginWindow]` and `Optional[MainWindow]` instances, respectively.
 
-It also creates `NetworkManager` and `FileManager` instances and assigns them to the `network_manager` and `file_manager` attributes:
+It also creates `NetworkManager` and `FileManager` instances and assigns them to the `network_manager` and `file_manager` attributes. NetworkManager is passed the server IP and port, and FileManager is passed the NetworkManager instance.
 
 > ### NetworkManager initialization
 >
 > The `NetworkManager` class is responsible for client-side management of the network communication between the client and the server. It has methods for connecting to the server, sending messages, and dispatching incoming server messages to event handlers.
 >
-> The `__init__` method of `NetworkManager` takes the `host` and `port` as arguments and saves them as instance variables. It then creates an empty `socket` (`socket.socket`) instance for the client and sets the `connected` instance variable to `False`. It also sets `max_buff_size` to 1024 (1 KB) and creates an empty `receive_thread` instance variable for storing the `threading.Thread` instance that will handle incoming messages from the server.
+> The `__init__` method of `NetworkManager` takes the `host` and `port` as arguments and saves them as instance variables. It then creates an empty `socket` (`socket.socket`) instance for the client and initializes the `connected` instance variable to `False`. It also sets `max_buff_size` to 1024 (1 KB) and creates an empty `receive_thread` instance variable for storing the `threading.Thread` instance that will receive and handle incoming messages from the server.
 >
-> Finally, it creates an empty `username` instance variable for tracking the currently authenticated user and an `event_handlers` instance variable for storing the event handlers (`dict[str, list[Callable]]`) for each event. The latter is initialized with a handler for the "unknown" event type that logs an error message.
+> Finally, it creates an empty `username` instance variable for tracking the currently authenticated user and an empty `event_handlers` instance variable for storing the event handlers (`dict[str, list[Callable]]`) for each event.
 >
 > ### FileManager initialization
 >
 > The `FileManager` class is responsible for managing file transfers between users. It has methods for sending and receiving file data.
 >
-> Its `__init__` method takes the `network_manager` as an argument and saves them as instance variables. It also creates an empty `_file_transfer_pending` boolean instance variable to indicate whether a transfer is in progress, as well as `_filename` and `_filename_short` instance variables for storing the filename and basename for any current transfer.
+> Its `__init__` method takes the `network_manager` as an argument and saves them as instance variables. It also creates an empty `_file_transfer_pending` boolean instance variable to indicate whether a transfer is in progress, as well as `_filename` and `_filepath` instance variables for storing the filename and basename for any pending transfer.
 
 ## Client.run
 
