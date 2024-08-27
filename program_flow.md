@@ -2,25 +2,27 @@
 
 We are going to iteratively build up a natural language description of our program flow. We will look at one file at a time and only consider the code in that file.
 
-The program has three entry points: the `client.py` file in the `client` module, the `server.py` file in the `server` module, and an `agent.py` file in the `agent` folder (for spinning up an automated user agent for testing).
+The program has two entry points: the `client.py` file in the `client` module and the `server.py` file in the `server` module.
 
 ## Logger configuration
 
-The first thing in each entrypoint is a function call to `configure_logger` and assignment of a `logging.getLogger()` result to a `logger` variable. The `configure_logger` function is defined in `utils/logger.py`.
+The first thing each entrypoint does is load environment variables with `python-dotenv`, call the `configure_logger` function with the `LOG_LEVEL` environment variable as an argument, and assign the result of `logging.getLogger()` to a `logger` variable.
 
-This function first creates a `root` logger set to log messages at the `logging.DEBUG` level and adds a `logger.StreamHandler` to it. It also creates and adds a `logging.Formatter` that includes the timestamp, name, log level, and message.
+The `configure_logger` function is defined in `utils/logger.py`. This function first creates a `root` logger set to log messages at a level determined by the environment variable, and adds a `logger.StreamHandler` to it. It also creates and adds a `logging.Formatter` that includes the timestamp, name, log level, and message.
 
-The function then creates and adds a `queue.Queue` with -1 `maxsize` (no limit) and a `logging.handlers.QueueHandler` that uses the queue as a buffer. It also creates and starts a `logging.handlers.QueueListener`. Under the hood, the `QueueHandler` will push log records to the queue, and the `QueueListener` will pop them off and pass them to the `StreamHandler`.
+The function then creates and adds a `queue.Queue` with -1 `maxsize` (no limit) and a `logging.handlers.QueueHandler` that uses the queue as its buffer. It also creates and starts a `logging.handlers.QueueListener`. Under the hood, the `QueueHandler` will push log records to the queue, and the `QueueListener` will pop them off and pass them to the `StreamHandler`.
 
 Since `logging.Logger` instances are singletons, we don't return the logger from this function. Rather, we run the `configure_logger` function once at the entrypoint, and all subsequent calls to `logging.getLogger` will inherit the configuration from the root logger.
 
 ## Server `RequestHandler` initialization
 
-When we start the server with `python -m server.server`, it initializes a `socketserver.ThreadingTCPServer` instance that listens for incoming connections on 0.0.0.0:8888 until the server errors or is manually stopped by a keyboard interrupt, at which point it logs a message and closes the server. When initializing the `socketserver.ThreadingTCPServer` server, it passes a `RequestHandler` class (which inherits from `socketserver.BaseRequestHandler`) to the constructor. This class contains methods for managing client connections and handling authentication, chat messages, and file transfers.
+When we start the server with `python -m server.server`, it initializes a `socketserver.ThreadingTCPServer` instance that listens for incoming connections on 0.0.0.0:8888 until the server errors or is manually stopped by a keyboard interrupt, at which point it logs a message and closes the server. When initializing the `socketserver.ThreadingTCPServer` server, the entrypoint passes a `RequestHandler` class (which inherits from `socketserver.BaseRequestHandler`) to the constructor. 
 
-The `socketserver.ThreadingTCPServer` will spin up a new thread and a separate `RequestHandler` instance for each client connection. Class variables (not to be confused with instance variables) are used for synchronization across threads. A `clients_lock` class variable is used as a context manager for thread-safety when accessing the `clients` dictionary, which is a class variable mapping usernames to `Handler` instances. Additionally, the class has a `user_manager` (an instance of `UserManager`) for storing and accessing user records and `chat_history` (an instance of `ChatHistory`) for storing and accessing chat logs. It also defines a constant `max_buff_size` of 1024 (1 KB) as the maximum buffer size for receiving data.
+Like the Python logger, `socketserver.ThreadingTCPServer` and `socketserver.BaseRequestHandler` follow the Borg/Monostate pattern. What that means in practice is that a new thread and `RequestHandler` instance will be spun up for each client connection (but never more than one per connection).
 
-While the class and its variables will be shared across all threads, instances and their variables will be unique to each thread. The `RequestHandler` class's `setup` method creates empty `user`, `file_peer`, and `authed` instance variables for tracking the current user, the file transfer peer, and the authentication status of the user. This is a special named method called by `socketserver.ThreadingTCPServer` when setting up a new thread upon client connection (so you don't have to override the `__init__` method).
+The `RequestHandler` class contains methods for managing client connections and handling authentication, chat messages, and file transfers. Class variables (not to be confused with instance variables) are used for synchronization across threads.A `clients_lock` class variable is used as a context manager for thread-safety when accessing the `clients` dictionary, which is a class variable mapping usernames to `Handler` instances. Additionally, the class has a `user_manager` attribute (an instance of `UserManager`) for storing and accessing user records, and a `chat_history` attribute (an instance of `ChatHistory`) for storing and accessing chat logs. It also defines a constant `max_buff_size` of 1024 (1 KB) as the maximum buffer size for receiving data.
+
+While the class and its variables will be shared across all threads, instances and their variables will be unique to each thread. The `RequestHandler` class's `setup` method creates empty `username`, `file_peer`, and `authed` instance variables for tracking the username of the user connected to that instance, the username of any current file transfer peer, and the authentication status of the connected user. `setup` is a special named method called by `socketserver.ThreadingTCPServer` when setting up a new thread and `BaseRequestHandler` instance upon client connection (so you don't have to override the handler class's `__init__` method to define custom initialization logic).
 
 > ### UserManager initialization
 >
