@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+from typing import Literal
 from client.network_manager import NetworkManager
 
 
@@ -63,73 +64,87 @@ class LoginWindow:
             messagebox.showerror("Error", f"Failed to create login window: {str(e)}")
             raise e
 
-    # --- Window setup and teardown ---
+        # --- Window setup and teardown ---
 
-    def show(self):
+    def show(self) -> bool:
+        # Start the UI loop
         self.window.mainloop()
+
+        exceptions = []
+
+        # Clean up the connection after window is closed if the user didn't log in
         try:
-            self.network_manager.clear_event_handlers()
             if not self.authed:
                 self.network_manager.close_connection()
-            self.destroy()
-            return self.authed
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to close login window: {str(e)}")
-            raise e
+            exceptions.append(f"Failed to close connection: {str(e)}")
 
-    def destroy(self):
+        # Clean up event handlers
+        try:
+            self.network_manager.clear_event_handlers()
+        except Exception as e:
+            exceptions.append(f"Failed to clear event handlers: {str(e)}")
+
+        # Destroy the window
         try:
             self.window.destroy()
-        except:
-            pass
+        except Exception as e:
+            exceptions.append(f"Failed to destroy window: {str(e)}")
+
+        # Display a generic error message if any exceptions occurred
+        if exceptions:
+            messagebox.showerror(
+                "Error", "An error occurred when closing the login window."
+            )
+            raise Exception(" | ".join(exceptions))
+
+        return self.authed
 
     # --- Outgoing server command triggers ---
 
     def login(self) -> None:
+        self.send_authentication_request("login")
+
+    def register(self) -> None:
+        self.send_authentication_request("register")
+
+    def send_authentication_request(self, command: str) -> None:
         # To get value of tk.StringVar, use .get()
         username: str = self.username.get()
         password: str = self.password.get()
         try:
             self.network_manager.send(
-                {"command": "login", "username": username, "password": password}
+                {"command": command, "username": username, "password": password}
             )
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to send login request: {str(e)}")
-
-    def register(self) -> None:
-        # To get value of tk.StringVar, use .get()
-        username: str = self.username.get()
-        password: str = self.password.get()
-        self.network_manager.send(
-            {"command": "register", "username": username, "password": password}
-        )
+            messagebox.showerror("Error", f"Failed to send {command} request: {str(e)}")
 
     # --- Incoming event handlers ---
 
     def handle_register_result(self, data: dict) -> None:
-        try:
-            if data.get("response") == "ok":
-                messagebox.showinfo(
-                    "Success", "Registration successful. You can now log in."
-                )
-            elif data.get("response") == "fail":
-                messagebox.showerror(
-                    "Error", f"Registration failed: {data.get('reason')}"
-                )
-            else:
-                raise Exception("Invalid response from server.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Registration failed: {str(e)}")
+        if data.get("response") == "ok":
+            messagebox.showinfo("Success", "Registration successful!")
+        else:
+            self.handle_authentication_failure(data, "register")
 
     def handle_login_result(self, data: dict) -> None:
+        if data.get("response") == "ok":
+            self.authed = True
+            self.network_manager.username = str(data.get("username"))
+            self.window.quit()
+        else:
+            self.handle_authentication_failure(data, "login")
+
+    def handle_authentication_failure(
+        self, data: dict, command: Literal["login", "register"]
+    ) -> dict | None:
         try:
-            if data.get("response") == "ok":
-                self.authed = True
-                self.network_manager.username = str(data.get("username"))
-                self.window.quit()
-            elif data.get("response") == "fail":
-                messagebox.showerror("Error", f"Login failed: {data.get('reason')}")
-            else:
+            if data.get("response") == "fail":
+                raise Exception(data.get("reason"))
+            elif data.get("response") != "ok":
                 raise Exception("Invalid response from server.")
+            else:
+                raise Exception("Unknown error occurred.")
         except Exception as e:
-            messagebox.showerror("Error", f"Login failed: {str(e)}")
+            messagebox.showerror("Error", f"{command.capitalize()} failed: {str(e)}")
+            return None
