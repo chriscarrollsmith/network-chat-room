@@ -68,7 +68,6 @@ class RequestHandler(socketserver.BaseRequestHandler):
             except Exception as e:
                 logger.error(f"Error handling request from {self.client_address}: {e}")
                 break
-        self.finish()
 
     def finish(self) -> None:
         """
@@ -124,8 +123,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing authentication information.
         """
-        self.username = data.get("username", "")
-        logger.debug(f"Handling authentication for user: {self.username}")
+        logger.debug(f"Handling authentication for client {self.client_address}")
 
         if data.get("command") == "login":
             self._process_login(data)
@@ -136,24 +134,30 @@ class RequestHandler(socketserver.BaseRequestHandler):
             logger.warning(f"Unknown authentication command: {data.get('command')}")
 
     def _process_login(self, data: dict[str, str]) -> None:
+        username: str = data.get("username", "")
+        password: str = data.get("password", "")
+
         login_result: dict[str, str] = {
             "type": "login_result",
-            "username": data.get("username", ""),
+            "username": username,
         }
-        if self.user_manager.validate(
-            data.get("username", ""), data.get("password", "")
-        ):
+
+        if self.user_manager.validate(username, password):
             login_result.update({"response": "ok"})
-            send(self.request, login_result)
+
+            # Update authentication state
+            self.username = username
             self.authed = True
             with RequestHandler.clients_lock:
                 RequestHandler.clients[self.username] = self
+
             self._notify_peer_joined()
         else:
             login_result.update(
                 {"response": "fail", "reason": "Incorrect username or password!"}
             )
-            send(self.request, login_result)
+
+        send(self.request, login_result)
 
     def _process_registration(self, data: dict[str, str]) -> None:
         """
@@ -162,38 +166,33 @@ class RequestHandler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing registration information.
         """
-        logger.debug(f"Processing registration for user: {data.get('username', '')}")
+        username: str = data.get("username", "")
+        password: str = data.get("password", "")
+
         register_result: dict[str, str] = {
             "type": "register_result",
-            "username": data.get("username", ""),
+            "username": username,
         }
+
         try:
-            logger.debug("Attempting to register user with UserManager")
-            registration_success = self.user_manager.register(
-                data.get("username", ""), data.get("password", "")
-            )
-            logger.debug(f"UserManager.register result: {registration_success}")
+            registration_success = self.user_manager.register(username, password)
 
             if registration_success:
                 register_result.update({"response": "ok"})
-                logger.debug(
-                    f"Registration successful for user: {data.get('username', '')}"
-                )
+                logger.debug(f"Registration successful for user: {username}")
             else:
                 register_result.update(
                     {"response": "fail", "reason": "Username already exists!"}
                 )
                 logger.debug(
-                    f"Registration failed for user: {data.get('username', '')} - Username already exists"
+                    f"Registration failed for user: {username} - Username already exists"
                 )
-
-            logger.debug(f"Sending registration result: {register_result}")
-            send(self.request, register_result)
         except Exception as e:
             logger.error(f"Error during registration process: {str(e)}")
             register_result.update(
                 {"response": "fail", "reason": "Internal server error"}
             )
+        finally:
             send(self.request, register_result)
 
     ## Authenticated command handlers
