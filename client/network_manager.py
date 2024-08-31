@@ -66,9 +66,9 @@ class NetworkManager:
                 )
 
     def send(self, data_dict: dict[str, Any]) -> None:
-        if not self.socket:
-            raise ConnectionError("Error sending data: lost connection to server")
         try:
+            if not self.socket:
+                raise ConnectionError("Lost connection to server")
             send(self.socket, data_dict)
         except Exception as e:
             logger.error(f"Send error: {str(e)}")

@@ -31,6 +31,8 @@ class RequestHandler(socketserver.BaseRequestHandler):
     # Maximum buffer size for receiving data
     max_buff_size: int = 1024
 
+    # -- Client connection lifecycle methods --
+
     def setup(self) -> None:
         """
         Initialize the handler for a new client connection.
@@ -82,6 +84,38 @@ class RequestHandler(socketserver.BaseRequestHandler):
                     logger.info(f"Removed {self.username} from connected clients")
 
             self._notify_peer_left()
+
+    # -- Notification methods --
+
+    def _notify_peer_joined(self) -> None:
+        """
+        Notify other clients about the new user joining.
+
+        Triggered in `_process_login` after successful authentication.
+        """
+        with RequestHandler.clients_lock:
+            for user in RequestHandler.clients.keys():
+                send(
+                    RequestHandler.clients[user].request,
+                    {"type": "peer_joined", "peer": self.username},
+                )
+
+    def _notify_peer_left(self) -> None:
+        """
+        Notify other clients about the user leaving.
+
+        Triggered in `finish` method after the client disconnects.
+        """
+        with RequestHandler.clients_lock:
+            for user in RequestHandler.clients.keys():
+                send(
+                    RequestHandler.clients[user].request,
+                    {"type": "peer_left", "peer": self.username},
+                )
+
+    # -- Command handlers --
+
+    ## Authentication command handlers
 
     def _handle_authentication(self, data: dict[str, str]) -> None:
         """
@@ -162,16 +196,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
             )
             send(self.request, register_result)
 
-    def _notify_peer_joined(self) -> None:
-        """
-        Notify other clients about the new user joining.
-        """
-        with RequestHandler.clients_lock:
-            for user in RequestHandler.clients.keys():
-                send(
-                    RequestHandler.clients[user].request,
-                    {"type": "peer_joined", "peer": self.username},
-                )
+    ## Authenticated command handlers
 
     def _handle_authenticated_commands(self, data: dict[str, str]) -> None:
         """
@@ -345,17 +370,6 @@ class RequestHandler(socketserver.BaseRequestHandler):
             data (dict): The received data (unused in this method).
         """
         self.finish()
-
-    def _notify_peer_left(self) -> None:
-        """
-        Notify other clients about the user leaving.
-        """
-        with RequestHandler.clients_lock:
-            for user in RequestHandler.clients.keys():
-                send(
-                    RequestHandler.clients[user].request,
-                    {"type": "peer_left", "peer": self.username},
-                )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 # TODO: Implement better encryption and secure key exchange
+# TODO: Consolidate encrypt/decrypt functions for central point of control of encryption behavior (use a reversible list of steps?)
 
 import base64
 import os

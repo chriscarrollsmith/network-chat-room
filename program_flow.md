@@ -96,7 +96,7 @@ Note: in terms of flow control, the loop assumes that the `receive` method will 
 
 The loop will stop (and the thread will exit) if (and only if) the `socket` is falsy or an error is raised in `receive` or any of the handlers. (So we need to be careful to catch and gracefully handle any handler exceptions we don't want to terminate the client, and also to disconnect the socket when we want the client to close or the `_receive_loop` to stop.)
 
-## The `utils.encryption.receive` function
+### The `utils.encryption.receive` function
 
 The functions in the `utils.encryption` module are the workhorses of the client-server communication, designed for reusability at both ends. We'll cover `receive` here and `send` later.
 
@@ -112,9 +112,9 @@ Then, with a five-second timeout set, we enter a while loop that continues until
 
 Finally, we extract the key (first 32 bytes of `data`), IV (next 16 bytes), and encrypted data (remaining bytes) and assign them to `key`, `iv`, and `encrypted_data`, respectively. We then call `decrypt` with `encrypted_data`, `key`, and `iv`, deserialize the decrypted JSON string using `json.loads`, and return the decrypted data as a dictionary.
 
-> ### `utils.encryption.decrypt` function
+> #### `utils.encryption.decrypt` function
 >
-> The `decrypt` function takes `data`, `key`, and `iv` (all `bytes`) as arguments. It base64 decodes the encrypted data using `base64.b64decode`, initializes an empty byte array, and then loops through the bytes in `encrypted_data`, using the caret XOR operator to double-decrypt the data using the key and IV. Instead of linearly repeating the key and IV, we use the floor division operator to repeat each byte of the key and IV as many times as necessary to match the length of the encrypted data. We then return the decrypted data.
+> The `decrypt` function takes `data`, `key`, and `iv` (all `bytes`) as arguments. It base64 decodes the encrypted data using `base64.b64decode`, initializes an empty byte array, and then loops through the bytes in `encrypted_data`, using the caret XOR operator to double-decrypt the data using the key and IV (which are repeated as many times as necessary with the help of the mod operator). We then return the decrypted data.
 
 ## Client login window initialization
 
@@ -146,52 +146,48 @@ If an error occurs during any of these initialization steps, `__init__` shows an
 
 ## Showing the client login window
 
-The `LoginWindow`'s `show` method, called by C`lient.run` after window initialization is complete, calls the window's `mainloop` method (a tkinter method that listens for and handles UI events). The behavior of this method is to block until the window is closed by the user or the `quit` method is called on the window.
+The `LoginWindow`'s `show` method, called by `Client.run` after window initialization is complete, calls the window's `mainloop` method (a tkinter method that listens for and handles UI events). The behavior of this method is to block until the window is closed by the user or the `quit` method is called on the window.
 
-Once the window is closed, `show` calls the `network_manager's` `clear_event_handlers` method to remove the event handlers that deal with login and registration results. Then it calls the `window`'s `destroy` method to close the window, and it returns the `authed` instance variable to the calling context (the `run` method of `Client`). If an error occurs during any of these steps, `show` shows an error messagebox and then raises the error to the calling context to terminate the program.
+Once the window is closed, `show` calls the `network_manager's` `clear_event_handlers` method to remove the event handlers that deal with login and registration results. It also calls the `window`'s `destroy` method to close the window. If `authed` is `False`, it also calls the `network_manager's` `close_connection` method to clean up the socket and thread. If errors occur during these teardown steps, they are collected and raised to the calling context (the `run` method of `Client`), and a tkinter messagebox displays a generic error message. Otherwise, we return the value of the `authed` instance variable.
 
 ## Client-side authentication request handling
 
-When the user clicks the "Login" or "Register" button in the `LoginWindow`, the `login` or `register` method is called, respectively. These methods are responsible for getting the username and password from the `username` and `password` fields, sending them to the `network_manager` for communication with the server, and displaying a success or failure messagebox to the user. `login` additionally sets the `login_successful` instance variable to `True` and exits the event loop by calling the tkinter window's `quit` method if the server indicates a successful login.
+When the user clicks the "Login" or "Register" button in the `LoginWindow`, the `login` or `register` method is called. Each method gets the username and password from the `username` and `password` fields, calls the `network_manager` `send` method to pass the request to the server, and displays a success or failure messagebox to the user.
 
-### `NetworkManager` `register` method
+The payload sent to `send` is a dictionary with a "type" key set to "login" or "register" and "username" and "password" keys set to the user's input.
 
-The `register` method of `NetworkManager` calls the `send` method of the same class, passing it a dictionary that includes "username", "password", and "command" keys. "command" is set to "register" to indicate that the client is requesting to register a new user account. We then call `receive` and assign the return value to the `response` variable. If the resonse is non-empty and its "response" key is "ok", the user is registered successfully and the method returns `True`. Otherwise, it returns `False`.
-
-> #### `NetworkManager` `send` method
+> ### `NetworkManager` `send` method
 >
-> The `send` method checks if `connected` instance variable is `False` or `socket` is `None`, in which case it logs a `ConnectionError` and calls `close` (which cleans up any socket by calling `socket.socket.close` and any `receive_thread` by calling `threading.Thread.join`).
+> The `send` method checks if the `socket` is truthy. If not, it raises a `ConnectionError`. If so, it calls `encryption.utils.send`, passing the `socket` and payload as arguments.
 >
-> Otherwise, it calls `encryption.utils.send`, passing the `socket` and payload as arguments. It returns `None`.
+> If an error occurs, we call `close_connection` to log the error, clean up any socket and `receive_thread`, and raise the error to the calling context (some `LoginWindow` or `MainWindow` method), which will be responsible for handling it gracefully.
 
-### `NetworkManager` `login` method
+### The `utils.encryption.send` function
 
-The `login` method of `NetworkManager` calls the `send` method, passing it a dictionary with "username", "password", and "command" set to "login". We then call `receive` and assign the return value to `response`. If the resonse is non-empty and its "response" key is "ok", the NetworkManager's username instance variable is set for the current session, the `start_receive_loop` method is called to start listening for server messages that will trigger UI updates for the main window, and the method returns `True`. Otherwise, it returns `False`.
+The `send` function takes a `socket` and a `data_dict` as arguments. It first calls `generate_key`, which generates and returns a 32-byte random binary encryption key using `os.urandom(32)`. Then it converts the dictionary to a UTF-8 encoded JSON string using `json.dumps`. Then it passes the `json_data` and `key` to `encrypt`, assigning the result to `encrypt_result`.
 
-## Encryption utility functions
-
-The `send` and `receive` methods call some utility functions from `utils/encryption.py` that are shared by both the client and server, so this is a good place to explain how those functions work. These workhorse functions will be used throughout the application, not just for `login` and `register`, but this explanation will not be repeated, so you may want to come back and review it again later to understand the program flow of the main window loop.
-
-### `send` and `encrypt` functions
-
-`send` takes a `socket` and a `data_dict` as arguments. It first calls `generate_key`, which generates and returns a 32-byte random binary encryption key using `os.urandom(32)`. Then it converts the dictionary to a UTF-8 encoded JSON string using `json.dumps`. Then it passes the `data` and `key` to `encrypt`. 
-
-`encrypt` generates a 16-byte random initialization vector (IV) and initializes an empty byte array. It then loops through the bytes in `data`, using the caret XOR operator and floor division to double-encrypt the data using the key and IV. It then base64 encodes the encrypted data using `base64.b64encode`. Finally, it returns the encoded and encrypted data along with the IV.
+> #### `utils.encryption.encrypt` function
+>
+> `encrypt` generates a 16-byte random initialization vector (IV) and initializes an empty `bytearray` named `encrypted`. It then loops through the bytes in `data`, using the caret XOR operator to double-encrypt the data using the key and IV, and the percent-sign mod operator to repeat the key and IV as many times as necessary. It then base64 encodes the encrypted data using `base64.b64encode`. Finally, it returns the encoded data along with the IV.
 
 `send` then concatenates the key, IV, and encrypted data and assigns the result to `data_to_send`. Next, it calls `pack`, which prepends a 2-byte unsigned big-endian integer representing the length of `data_to_send` using `struct.pack` and returns the packed data. Finally, `send` sends the packed bytes to the server using `socket.socket.sendall`.
+
+## Client-side authentication response handling
+
+In addition to methods for sending authentication requests to the server, `LoginWindow` also has handlers for the server's responses to those requests. (These methods are added as event handlers to the `network_manager` in the `LoginWindow`'s `__init__` method and removed in the `show` method after the `mainloop` ends.)
+
+When the server sends a response to a login or registration request, the `NetworkManager`'s `_receive_loop` checks the reponse's "type" key and dispatches events to the corresponding handler. If the authentication handlers have been correctly mounted, "login" and "register" responses will trigger the `handle_login_result` and `handle_register_result` methods of the `LoginWindow` instance, respectively.
+
+Both methods check the "response" key to see if the value is "ok". If it is, `login` sets the `authed` instance variable to `True`, gets the username for the current session from the `network_manager`'s `username` instance variable, and calls `quit` on the `window` to end the `mainloop` (so `show` will clean up the window and return the `authed` result to the `run` method of `Client`). `register`, on the other hand, merely displays a success messagebox.
+
+If the "response" key is not "ok", both methods call `handle_authentication_failure`, which displays a descriptive error messagebox to the user. If "response" was "fail", the "reason" key will contain a string describing the failure; otherwise we display a generic error message.
 
 ## Server-side authentication request handling
 
 **TODO**
 
-## Client-side authentication response handling
-
-**TODO**
-
-## Main window loop
+## Client `MainWindow` loop
 
 **TODO**
 
 The `show_main` method creates a `threading.Thread` instance to handle incoming messages from the server, and assigns it to the `receive_thread` instance variable. The `_receive_loop` method of the `NetworkManager` class is passed as the target for the thread, and the thread is started.
-
-The `_receive_loop` method of the `NetworkManager` class is a daemon thread that runs in the background and continuously listens for incoming messages from the server. It uses the `receive` method of the `NetworkManager` to receive messages and update the UI accordingly.
