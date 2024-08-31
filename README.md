@@ -1,8 +1,12 @@
 # Network Chat Room
 
-#### Video Demo: https://youtu.be/Dd-VK9v8-D8
+#### Video Demo:
 
-#### Description: A Python-based AIM (AOL Instant Messenger)-style desktop chat room application, loosely based on [rihothy](https://github.com/rihothy)'s [socket-chat-room](https://github.com/rihothy/socket-chat-room), using Tkinter for GUI and sockets for network communication.
+[![YouTube thumbnail for Chat with custom AI agents in an AIM-style chat room](https://img.youtube.com/vi/_Hzst-ZIW5M/0.jpg)](https://youtu.be/_Hzst-ZIW5M))
+
+#### Description:
+
+A Python-based AIM (AOL Instant Messenger)-style desktop chat room application, loosely based on [rihothy](https://github.com/rihothy)'s [socket-chat-room](https://github.com/rihothy/socket-chat-room), using Tkinter for GUI and sockets for network communication.
 
 ## Purpose
 
