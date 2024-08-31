@@ -40,7 +40,7 @@ class Client:
         self.login_window = LoginWindow(self.network_manager)
 
         # Show login window and wait for user to authenticate
-        auth_success = self.login_window.show()
+        auth_success: bool | None = self.login_window.show()
 
         if not auth_success:
             return

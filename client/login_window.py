@@ -8,19 +8,16 @@ class LoginWindow:
         try:
             self.network_manager: NetworkManager = network_manager
 
-            self.authed: bool = False
-
+            # Create and set up tkinter "Login" window
             self.window: tk.Tk = tk.Tk()
-            self.username: tk.StringVar = tk.StringVar()
-            self.password: tk.StringVar = tk.StringVar()
-
             self.window.title("Login")
-
-            # Set minimum size instead of fixed size
             self.window.minsize(300, 180)
-
-            # Allow window to be resized
             self.window.resizable(True, True)
+
+            # Initialize auth state variables
+            self.authed: bool = False
+            self.username: tk.StringVar = tk.StringVar(self.window)
+            self.password: tk.StringVar = tk.StringVar(self.window)
 
             # Main frame
             main_frame = tk.Frame(self.window, padx=20, pady=20)
@@ -52,6 +49,9 @@ class LoginWindow:
                 side=tk.RIGHT, expand=True, padx=5
             )
 
+            # Bind Enter key to login
+            self.window.bind("<Return>", self.login)
+
             # Register event handlers
             self.network_manager.add_event_handler(
                 "login_result", self.handle_login_result
@@ -75,6 +75,7 @@ class LoginWindow:
             return self.authed
         except Exception as e:
             messagebox.showerror("Error", f"Failed to close login window: {str(e)}")
+            raise e
 
     def destroy(self):
         try:
