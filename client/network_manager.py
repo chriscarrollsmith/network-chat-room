@@ -14,7 +14,6 @@ class NetworkManager:
         self.host: str = host
         self.port: int = port
         self.socket: socket.socket | None = None
-        self.connected: bool = False
         self.max_buff_size: int = 1024
         self.receive_thread: threading.Thread | None = None
 
@@ -25,7 +24,6 @@ class NetworkManager:
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
-            self.connected = True
             self.start_receive_loop()
 
             self.validate_connection_state(should_be_connected=True)
@@ -34,12 +32,6 @@ class NetworkManager:
             raise ConnectionError(f"Failed to connect to server: {str(e)}")
 
     def validate_connection_state(self, should_be_connected: bool = True) -> None:
-        state: str = "connected" if should_be_connected else "disconnected"
-        opposite_state: str = "disconnected" if should_be_connected else "connected"
-
-        if should_be_connected != self.connected:
-            raise ConnectionError(f"Expected to be {state} but was {opposite_state}.")
-
         if should_be_connected:
             if not self.socket:
                 raise ConnectionError(
@@ -74,7 +66,7 @@ class NetworkManager:
                 )
 
     def send(self, data_dict: dict[str, Any]) -> None:
-        if not self.connected or self.socket is None:
+        if not self.socket:
             raise ConnectionError("Error sending data: lost connection to server")
         try:
             send(self.socket, data_dict)
@@ -82,25 +74,6 @@ class NetworkManager:
             logger.error(f"Send error: {str(e)}")
             self.close_connection()
             raise e
-
-    def receive(self) -> dict[str, Any] | None:
-        if not self.connected or self.socket is None:
-            raise ConnectionError("Not connected to server")
-        try:
-            data: dict[str, Any] = receive(self.socket, self.max_buff_size)
-            logger.debug(f"Decrypted data: {data}")
-            return data
-        except json.JSONDecodeError:
-            logger.error("Received invalid JSON data")
-            return None
-        except ConnectionError as e:
-            logger.error(f"Connection error: {e}")
-            self.close_connection()
-            return None
-        except Exception as e:
-            logger.error(f"Receive error: {str(e)}")
-            self.close_connection()
-            return None
 
     def start_receive_loop(self) -> None:
         if not self.receive_thread:
@@ -117,9 +90,32 @@ class NetworkManager:
     def clear_event_handlers(self) -> None:
         self.event_handlers = {}
 
+    def handle_receive_errors(self, receive_func: Callable) -> dict[str, Any] | None:
+        try:
+            if not self.socket:
+                raise ConnectionError("Not connected to server")
+            data: dict[str, Any] = receive_func(self.socket, self.max_buff_size)
+            logger.debug(f"Decrypted data: {data}")
+            return data
+        except json.JSONDecodeError:
+            logger.error("Received invalid JSON data")
+            return None
+        except TimeoutError as e:
+            logger.error("Receive timed out: {e}")
+            self.close_connection()
+            return None
+        except ConnectionError as e:
+            logger.error(f"Connection error: {e}")
+            self.close_connection()
+            return None
+        except Exception as e:
+            logger.error(f"Receive error: {str(e)}")
+            self.close_connection()
+            return None
+
     def _receive_loop(self) -> None:
-        while self.connected:
-            data: dict | None = self.receive()
+        while self.socket:
+            data: dict | None = self.handle_receive_errors(receive)
             if data:
                 event: str = data.get("type", "unknown")
                 handlers: list[Callable] = self.event_handlers.get(event, [])
@@ -132,7 +128,6 @@ class NetworkManager:
                 logger.warning(f"Empty message received from server.")
 
     def close_connection(self) -> None:
-        self.connected = False
         if self.socket:
             self.socket.close()
         self.socket = None
