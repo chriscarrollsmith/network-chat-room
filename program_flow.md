@@ -150,7 +150,7 @@ The `LoginWindow`'s `show` method, called by `Client.run` after window initializ
 
 Once the window is closed, `show` calls the `network_manager's` `clear_event_handlers` method to remove the event handlers that deal with login and registration results. It also calls the `window`'s `destroy` method to close the window. If `authed` is `False`, it also calls the `network_manager's` `close_connection` method to clean up the socket and thread. If errors occur during these teardown steps, they are collected and raised to the calling context (the `run` method of `Client`), and a tkinter messagebox displays a generic error message. Otherwise, we return the value of the `authed` instance variable.
 
-## Client-side authentication request handling
+## Client-side authentication request origination
 
 When the user clicks the "Login" or "Register" button in the `LoginWindow`, the `login` or `register` method is called. Each method gets the username and password from the `username` and `password` fields, calls the `network_manager` `send` method to pass the request to the server, and displays a success or failure messagebox to the user.
 
@@ -198,27 +198,27 @@ Inside the try block, we first call `utils.encryption.receive` (a blocking funct
 >
 > The `_handle_authentication` method takes the `data` dictionary as an argument. It checks the value of the "command" key in the data and calls either `process_login` if the value is "login" or `process_register` if it's "register". If "command" is something else, it logs a warning.
 >
->> ### The `process_login` method of the `RequestHandler` class
+>> ### The `_process_registration` method of the `RequestHandler` class
 >>
->> The `process_login` method takes the `data` dictionary as an argument. It constructs a preliminary `login_result` dictionary with "type" of "login_result" and the "username" value from "data" (with empty string as default). It then calls the `validate` method of `user_manager` with the "username" and "password" values from `data` (empty defaults).
+>> The `_process_registration` method takes the `data` dictionary as an argument. It fetches the username and password from `data` and calls the `register` method of the `user_manager` with those values. If the `register` method returns `True`, it constructs a `register_result` dictionary with "type" set to "register_result" and "response" set to "ok". If `register` returns `False`, it constructs the dictionary with "response" set to "fail" and "reason" set to "Username already exists!". It also catches any error and sends a generic "fail" message to the client in this case.
+>>
+>>> #### The `register` method of `UserManager`
+>>>
+>>> The `register` method takes `username` and `password` as arguments. With the `user_manager`'s lock as a context manager, it checks for `username` in the `users` dictionary and raises a warning and returns `False` if it's already present. Otherwise, it sets the value of the `username` key to `password` and calls `save_users` to persist the modified `users` dictionary to file. `save_users` opens the file at `users_filepath` in binary write mode, serializes the data with `pickle`, and dumps the data to file. If any error occurs during this operation, we catch it in `register`, log it, and return False.
+>>
+>> ### The `_process_login` method of the `RequestHandler` class
+>>
+>> The `_process_login` method takes the `data` dictionary as an argument. It constructs a preliminary `login_result` dictionary with "type" of "login_result" and the "username" value from "data" (with empty string as default). It then calls the `validate` method of `user_manager` with the "username" and "password" values from `data` (empty defaults).
 >> 
 >>> #### The `validate` method of `UserManager`
 >>>
 >>> `validate` simply engages a lock and then checks if the username and password match a record in the `user_manager`'s loaded `users` dictionary. If they do, it returns `True`; otherwise, it returns `False`.
 >>
->> If `validate` returns `True`, the `login_result` is updated with "response" set to "ok". It also sets `authed` to `True` and fetches the "username" attribute from `data` and assigns it to the `RequestHandler`'s `username` instance variable. Then it engages the `clients_lock` and adds the `username` to the `clients` dictionary of the RequestHandler class, with the value set to the `RequestHandler` instance. (This gives every currently authenicated user's RequestHandler instance access to the request API endpoint of the newly authenticated user's RequestHandler instance for the purpose of sending messages and notifications.) Finally, we call `_notify_peer_joined`, which engages the `clients_lock` and sends an event of "type" "peer_joined" to all other authenticated `clients`, with the "username" value from `self.username`.
+>> If `validate` returns `True`, the `login_result` is updated with "response" set to "ok". It also sets `authed` to `True` and fetches the "username" attribute from `data` and assigns it to the `RequestHandler`'s `username` instance variable. Then it engages the `clients_lock` and adds the `username` to the `clients` dictionary of the RequestHandler class, with the value set to the `RequestHandler` instance. (This gives every currently authenicated user's RequestHandler instance access to the `request` API endpoint of the newly authenticated user's RequestHandler instance for the purpose of sending chat and notification events to the client.) Finally, we call `_notify_peer_joined`, which engages the `clients_lock` and sends an event of "type" "peer_joined" to all other authenticated `clients`, with the "username" value from `self.username`.
 >>
 >> If, on the other hand, `validate` returns `False`, the `login_result` is updated with "response" set to "fail" and "reason" set to "Incorrect username or password!"
 >>
 >> Finally, the `login_result` is sent to the client using the `utils.encryption.send` method (explained above).
->>
->> ### The `process_register` method of the `RequestHandler` class
->>
->> The `process_register` method takes the `data` dictionary as an argument. It fetches the username and password from `data` and calls the `register` method of the `user_manager` with those values. If the `register` method returns `True`, it constructs a `register_result` dictionary with "type" set to "register_result" and "response" set to "ok". If `register` returns `False`, it constructs the dictionary with "response" set to "fail" and "reason" set to "Username already exists!". It also catches any error and sends a generic "fail" message to the client in this case.
->>
->>> #### The `register` method of `UserManager`
-
-**TODO**
 
 ## Client `MainWindow` loop
 

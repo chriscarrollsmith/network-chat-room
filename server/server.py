@@ -1,3 +1,7 @@
+# TODO: define authenticated command handler and
+# authentication command handler dictionaries on import
+# and consolidate dispatching logic in `handle` (DRY)
+
 # Import necessary modules
 import os
 import socketserver
@@ -204,6 +208,8 @@ class RequestHandler(socketserver.BaseRequestHandler):
         Args:
             data (dict): The received data containing the command and its parameters.
         """
+        command: str = data.get("command", "")
+
         command_handlers: dict[str, Callable[[dict[str, str]], None]] = {
             "get_users": self._handle_get_users,
             "get_history": self._handle_get_history,
@@ -213,7 +219,6 @@ class RequestHandler(socketserver.BaseRequestHandler):
             "close": self._handle_close,
         }
 
-        command: str = data.get("command", "")
         handler = command_handlers.get(command)
         if handler:
             try:

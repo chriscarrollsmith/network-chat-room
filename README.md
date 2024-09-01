@@ -2,7 +2,7 @@
 
 #### Video Demo:
 
-[![YouTube thumbnail for Chat with custom AI agents in an AIM-style chat room](https://img.youtube.com/vi/_Hzst-ZIW5M/0.jpg)](https://youtu.be/_Hzst-ZIW5M))
+[![YouTube thumbnail for Chat with custom AI agents in an AIM-style chat room](https://img.youtube.com/vi/_Hzst-ZIW5M/0.jpg)](https://youtu.be/_Hzst-ZIW5M)
 
 #### Description:
 
@@ -19,7 +19,11 @@ I mostly created this project for educational purposes:
 - Learn to implement compile-time static type checking with `mypy`.
 - Submit as my final project for the HarvardX course ["CS50's Introduction to Computer Science"](https://learning.edx.org/course/course-v1:HarvardX+CS50+X/home).
 
-However, I'm also envisioning a practical use for this project: having autonomous AI agents running in Docker containers and using the chat app to update them on my progress (so they can encourage me to keep working), and they in turn can update me on their progress (so I can give them directions and advice to coordinate their work).
+For my detailed description of how the code works, see [program_flow.md](https://github.com/chriscarrollsmith/network-chat-room/blob/main/program_flow.md).
+
+## Chatting with LLM Agents
+
+I'm also envisioning a practical use for this project: having autonomous AI agents running in Docker containers and using the chat app to update them on my progress (so they can encourage me to keep working), and they in turn can update me on their progress (so I can give them directions and advice to coordinate their work).
 
 You can find a starter template for building chat room-connected AI agents in the [network-chat-room-agent](https://github.com/chriscarrollsmith/network-chat-room-agent) repository.
 
@@ -145,7 +149,7 @@ For production use, consider implementing:
 
 - Secure key exchange protocol such as Diffie-Hellman, RSA, PSK, SSL/TLS, etc.
 - Stronger encryption algorithm such as AES-256, Blowfish, Twofish, etc.
-- Hashing stored user data with a secure hashing algorithm
+- Hashing stored user data with a secure hashing algorithm such as SHA-1
 - Database for user and chat history storage
 - Additional features and UI improvements
 - Compile a distributable executable for the client with `pyinstaller` or, alternatively, drop the tkinter GUI and build a browser-based client interface with JavaScript

@@ -53,25 +53,13 @@ class UserManager:
             True if registration is successful, False if the username already exists.
         """
         logger.debug(f"Attempting to register user: {username}")
-        try:
-            if not self.lock.acquire(timeout=5):
-                return False
-            try:
-                if username not in self.users:
-                    self.users[username] = password
-                    self.save_users()
-                    logger.info(f"User {username} registered successfully")
-                    return True
-                logger.warning(
-                    f"Registration failed: Username {username} already exists"
-                )
-                return False
-            finally:
-                self.lock.release()
-                logger.debug("Lock released")
-        except Exception as e:
-            logger.error(f"Unexpected error in register method: {str(e)}")
-            logger.error(traceback.format_exc())
+        with self.lock:
+            if username not in self.users:
+                self.users[username] = password
+                self.save_users()
+                logger.info(f"User {username} registered successfully")
+                return True
+            logger.warning(f"Registration failed: Username {username} already exists")
             return False
 
     def validate(self, username: str, password: str) -> bool:
@@ -94,10 +82,5 @@ class UserManager:
 
     def save_users(self) -> None:
         logger.debug("Saving users to file")
-        try:
-            with open(self.users_filepath, "wb") as f:
-                pickle.dump(self.users, f)
-        except Exception as e:
-            logger.error(f"Failed to save users: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(traceback.format_exc())
+        with open(self.users_filepath, "wb") as f:
+            pickle.dump(self.users, f)
